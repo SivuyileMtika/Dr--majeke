@@ -1,0 +1,40 @@
+/* Add your CSS selectors and rules here. For example: */
+#home {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  min-height: 60vh;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  background-image: url('/ChatGPT Image Jul 14, 2025, 01_27_59 AM.png');
+  width: 100vw;
+  box-sizing: border-box;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  #home {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+    min-height: 70vh;
+    max-height: none;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 600px) {
+  #home {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    min-height: 80vh;
+    width: 100vw;
+  }
+}

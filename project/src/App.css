@@ -1,0 +1,43 @@
+/* Add your CSS selectors and rules here. For example: */
+#home {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding-top: 3rem; /* reduced */
+  padding-bottom: 3rem; /* reduced */
+  padding-left: 1rem;
+  padding-right: 1rem;
+  min-height: unset;
+  max-height: unset;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  /* Add vendor prefix for box-sizing if supporting older browsers */
+  /* -webkit-box-sizing: border-box; */
+  background-size: cover;
+  background-position: center center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  #home {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+    min-height: 70vh;
+    max-height: none;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 600px) {
+  #home {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    min-height: 80vh;
+    width: 100vw;
+  }
+}

@@ -114,8 +114,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
                     required
                     value={loginData.email}
                     onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-2xl focus:border-orange-500 focus:outline-none transition-colors"
                     placeholder="Enter your email"
+                    className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-2xl focus:border-orange-500 focus:outline-none transition-colors"
                   />
                 </div>
               </div>
@@ -287,12 +287,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
           {mode === 'login' && (
             <div className="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-200">
-              <p className="text-sm text-orange-800 font-semibold mb-2">Demo Credentials:</p>
+              <p className="text-sm text-orange-800 font-semibold mb-2">Admin Credentials:</p>
               <p className="text-sm text-orange-700">
-                <strong>Admin:</strong> admin@majeke.co.za / admin123
+                <strong>Admin:</strong> admin@gmail.com / Admin@2025!
               </p>
             </div>
           )}
+
         </div>
       </div>
     </div>

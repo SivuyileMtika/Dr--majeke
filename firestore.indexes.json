@@ -1,0 +1,20 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "whatsapp_appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "preferredDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "whatsapp_messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "from", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

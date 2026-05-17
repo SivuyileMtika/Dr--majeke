@@ -64,8 +64,7 @@ try {
 }
 
 const app = express();
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',');
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({ origin: true, credentials: true }));
 
 // Twilio sends form-encoded POST bodies; JSON for our own REST endpoints
 app.use(bodyParser.urlencoded({ extended: false }));

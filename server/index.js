@@ -195,6 +195,34 @@ app.get('/medical-aids', async (req, res) => {
   }
 });
 
+app.post('/book', async (req, res) => {
+  try {
+    const { patient_name, phone, email, date, time, reason, payment_method, medical_aid, medical_plan, membership_number } = req.body || {};
+    if (!patient_name || !phone || !date || !time) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: patient_name, phone, date, time' });
+    }
+    const apt = await createAppointment(db, {
+      phone,
+      patient_name,
+      date,
+      time,
+      payment_method: payment_method || 'cash',
+      medical_aid: medical_aid || null,
+      membership_number: membership_number || null,
+    });
+    await db.collection('appointments').doc(apt.id).update({
+      source: 'website',
+      email: email || null,
+      reason: reason || null,
+      medical_plan: medical_plan || null,
+    });
+    return res.json({ success: true, appointmentId: apt.id });
+  } catch (err) {
+    console.error('book endpoint error:', err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 app.get('/', (req, res) => res.json({ ok: true, service: 'WhatsApp Booking System' }));
 
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

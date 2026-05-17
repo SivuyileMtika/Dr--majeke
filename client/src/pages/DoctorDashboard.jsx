@@ -84,8 +84,12 @@ export default function DoctorDashboard() {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState(null);
   const [tab, setTab]                   = useState('overview');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [search, setSearch]             = useState('');
+  const [filterStatus, setFilterStatus]   = useState('all');
+  const [filterSource, setFilterSource]   = useState('all');
+  const [filterPayment, setFilterPayment] = useState('all');
+  const [filterFrom, setFilterFrom]       = useState('');
+  const [filterTo, setFilterTo]           = useState('');
+  const [search, setSearch]               = useState('');
   const [actionLoading, setActionLoading] = useState({});
   const [actionError, setActionError]   = useState({});
   const [selectedDay, setSelectedDay]   = useState(null);
@@ -134,14 +138,22 @@ export default function DoctorDashboard() {
   const hasClash    = d => { const t = forDay(d).filter(a => a.status !== 'rejected').map(a => a.time); return t.length !== new Set(t).size; };
   const pending     = appointments.filter(a => a.status === 'pending_approval').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
 
+  const activeFilters = [filterStatus, filterSource, filterPayment, filterFrom, filterTo].filter(f => f && f !== 'all').length;
+
   const filtered = appointments
     .filter(a => filterStatus === 'all' || a.status === filterStatus)
+    .filter(a => filterSource === 'all' || (filterSource === 'website' ? a.source === 'website' : !a.source || a.source === 'whatsapp'))
+    .filter(a => filterPayment === 'all' || (filterPayment === 'medical_aid' ? a.payment_method === 'medical_aid' : a.payment_method !== 'medical_aid'))
+    .filter(a => !filterFrom || a.date >= filterFrom)
+    .filter(a => !filterTo   || a.date <= filterTo)
     .filter(a => !search || (a.patient_name || '').toLowerCase().includes(search.toLowerCase()) || (a.phone || '').includes(search))
     .sort((a, b) => {
       const va = sortField === 'date' ? a.date + a.time : (a[sortField] || '');
       const vb = sortField === 'date' ? b.date + b.time : (b[sortField] || '');
       return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
     });
+
+  const clearFilters = () => { setFilterStatus('all'); setFilterSource('all'); setFilterPayment('all'); setFilterFrom(''); setFilterTo(''); setSearch(''); };
 
   const toggleSort = f => { if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(f); setSortDir('asc'); } };
 
@@ -445,13 +457,57 @@ export default function DoctorDashboard() {
           {tab === 'table' && (
             <Card>
               {/* toolbar */}
-              <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderBottom: `1px solid ${PALETTE.slate100}` }}>
-                <input type="search" placeholder="Search name or phone…" value={search} onChange={e => setSearch(e.target.value)}
-                  style={{ flex: 1, minWidth: 200, border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '7px 12px', fontSize: 13, color: PALETTE.slate700 }} />
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {[['all','All'],['pending_approval','Pending'],['confirmed','Confirmed'],['rejected','Rejected']].map(([k, l]) => (
-                    <button key={k} className={`filter-btn ${filterStatus === k ? 'active' : ''}`} onClick={() => setFilterStatus(k)}>{l}</button>
-                  ))}
+              <div style={{ padding: '16px 20px', borderBottom: `1px solid ${PALETTE.slate100}` }}>
+                {/* row 1: search + clear */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+                  <input type="search" placeholder="Search name or phone…" value={search} onChange={e => setSearch(e.target.value)}
+                    style={{ flex: 1, border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '7px 12px', fontSize: 13, color: PALETTE.slate700 }} />
+                  {activeFilters > 0 && (
+                    <button onClick={clearFilters} style={{ background: 'none', border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, color: PALETTE.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Clear filters {activeFilters > 0 && `(${activeFilters})`}
+                    </button>
+                  )}
+                </div>
+                {/* row 2: filter groups */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  {/* Status */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Status</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[['all','All'],['pending_approval','Pending'],['confirmed','Confirmed'],['rejected','Rejected']].map(([k, l]) => (
+                        <button key={k} className={`filter-btn ${filterStatus === k ? 'active' : ''}`} onClick={() => setFilterStatus(k)}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Source */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Source</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[['all','All'],['whatsapp','WhatsApp'],['website','Website']].map(([k, l]) => (
+                        <button key={k} className={`filter-btn ${filterSource === k ? 'active' : ''}`} onClick={() => setFilterSource(k)}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Payment */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Payment</div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[['all','All'],['cash','Cash'],['medical_aid','Medical Aid']].map(([k, l]) => (
+                        <button key={k} className={`filter-btn ${filterPayment === k ? 'active' : ''}`} onClick={() => setFilterPayment(k)}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Date range */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Date Range</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+                        style={{ border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '5px 8px', fontSize: 12, color: PALETTE.slate700 }} />
+                      <span style={{ fontSize: 12, color: PALETTE.slate500 }}>to</span>
+                      <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+                        style={{ border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '5px 8px', fontSize: 12, color: PALETTE.slate700 }} />
+                    </div>
+                  </div>
                 </div>
               </div>
 

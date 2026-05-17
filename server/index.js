@@ -123,7 +123,7 @@ app.post('/webhook', async (req, res) => {
         nextState = await handlePatientName(db, phone, text, collectedData);
       } else if (nextState === 'confirm_details') {
         const t = text.toLowerCase();
-        if (t === '1' || t.includes('confirm') || t.includes('yes')) {
+        if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
           const apt = await createAppointment(db, {
             phone,
             patient_name:      collectedData.patient_name,

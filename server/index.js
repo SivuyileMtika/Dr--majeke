@@ -1,24 +1,25 @@
 /*
-.env.example (example vars expected):
+.env vars required:
 PORT=3000
-WHATSAPP_VERIFY_TOKEN=your_verify_token
-WHATSAPP_TOKEN=EAA... (Meta access token)
-WHATSAPP_PHONE_ID=1234567890
-FIREBASE_SERVICE_ACCOUNT={...}   # JSON string of service account or path to JSON file
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_WHATSAPP_NUMBER=+14155238886   (sandbox) or your approved number
+FIREBASE_SERVICE_ACCOUNT={...}        (JSON string or path to file)
 DOCTOR_AUTH_TOKEN=secure-token-here
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 */
 
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const admin = require('firebase-admin');
+const express    = require('express');
+const cors       = require('cors');
+const dotenv     = require('dotenv');
+const admin      = require('firebase-admin');
 const bodyParser = require('body-parser');
+const twilio     = require('twilio');
 const {
   getOrCreateConversation,
   updateConversationState,
   createAppointment,
   markSlotPending,
-  markSlotConfirmed,
 } = require('./utils/fireStoreHelpers');
 const { getServices, getMedicalAids } = require('./utils/fireStoreHelpers');
 const {
@@ -32,13 +33,13 @@ const {
   handlePatientName,
 } = require('./services/messageRouter');
 const { seedMedicalAids, seedServices, seedTimeSlots } = require('./utils/seeding');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware }           = require('./middleware/auth');
 const { confirmAppointmentHandler } = require('./controllers/appointmentController');
-const { sendWhatsAppMessage } = require('./utils/sendWhatsAppMessage');
+const { sendWhatsAppMessage }      = require('./utils/sendWhatsAppMessage');
 
 dotenv.config();
 
-const requiredEnvVars = ['WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_TOKEN', 'WHATSAPP_PHONE_ID', 'FIREBASE_SERVICE_ACCOUNT'];
+const requiredEnvVars = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_NUMBER', 'FIREBASE_SERVICE_ACCOUNT'];
 const missing = requiredEnvVars.filter(v => !process.env[v]);
 if (missing.length > 0) {
   console.error(`Missing required env vars: ${missing.join(', ')}`);
@@ -49,11 +50,7 @@ let db = null;
 try {
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT;
   let serviceAccount;
-  try {
-    serviceAccount = JSON.parse(sa);
-  } catch (e) {
-    serviceAccount = require(sa);
-  }
+  try { serviceAccount = JSON.parse(sa); } catch { serviceAccount = require(sa); }
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   db = admin.firestore();
   console.log('Firebase Admin initialized.');
@@ -69,110 +66,101 @@ try {
 const app = express();
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',');
 app.use(cors({ origin: allowedOrigins, credentials: true }));
+
+// Twilio sends form-encoded POST bodies; JSON for our own REST endpoints
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const PORT = process.env.PORT || 3000;
 
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode && token) {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      console.log('WEBHOOK_VERIFIED');
-      return res.status(200).send(challenge);
-    }
-    return res.status(403).json({ success: false, error: 'Invalid token' });
-  }
-  return res.status(400).json({ success: false, error: 'Missing mode or token' });
-});
-
-function getTextFromMessage(msg) {
-  if (!msg) return '';
-  if (msg.text && msg.text.body) return msg.text.body;
-  if (msg.type === 'button' && msg.button && msg.button.text) return msg.button.text;
-  return '';
-}
-
+// ── Twilio WhatsApp webhook ──────────────────────────────────────────────────
 app.post('/webhook', async (req, res) => {
+  // Validate the request came from Twilio
+  const twilioSignature = req.headers['x-twilio-signature'];
+  const webhookUrl = process.env.WEBHOOK_URL || `${req.protocol}://${req.get('host')}/webhook`;
+  const isValid = twilio.validateRequest(
+    process.env.TWILIO_AUTH_TOKEN,
+    twilioSignature,
+    webhookUrl,
+    req.body
+  );
+  if (!isValid && process.env.NODE_ENV === 'production') {
+    return res.status(403).send('Forbidden');
+  }
+
+  // Twilio body: From = "whatsapp:+2712345678", Body = message text
+  const rawFrom = req.body.From || '';
+  const phone   = rawFrom.replace('whatsapp:', '');
+  const text    = (req.body.Body || '').trim();
+
+  if (!phone) {
+    return res.status(400).send('Missing From');
+  }
+
+  console.log(`Message from ${phone}: ${text}`);
+
   try {
-    const body = req.body;
-    if (body.object && body.entry) {
-      for (const entry of body.entry) {
-        if (!entry.changes) continue;
-        for (const change of entry.changes) {
-          const value = change.value || {};
-          const messages = value.messages || [];
+    const conversation  = await getOrCreateConversation(db, phone);
+    let nextState       = conversation.current_state;
+    const collectedData = conversation.collected_data || {};
 
-          for (const msg of messages) {
-            const phone = msg.from;
-            const text = getTextFromMessage(msg) || '';
-            console.log(`Message from ${phone}: ${text}`);
+    try {
+      if (nextState === 'initial') {
+        nextState = await handleInitialMessage(db, phone, text);
+      } else if (nextState === 'menu') {
+        nextState = await handleMenuSelection(db, phone, text);
+      } else if (nextState === 'selecting_date') {
+        nextState = await handleDateSelection(db, phone, text, collectedData);
+      } else if (nextState === 'selecting_time') {
+        nextState = await handleTimeSelection(db, phone, text, collectedData);
+      } else if (nextState === 'payment_method') {
+        nextState = await handlePaymentMethod(db, phone, text, collectedData);
+      } else if (nextState === 'medical_aid_select') {
+        nextState = await handleMedicalAidSelection(db, phone, text, collectedData);
+      } else if (nextState === 'membership_number') {
+        nextState = await handleMembershipNumber(db, phone, text, collectedData);
+      } else if (nextState === 'patient_name') {
+        nextState = await handlePatientName(db, phone, text, collectedData);
+      } else if (nextState === 'confirm_details') {
+        const t = text.toLowerCase();
+        if (t === '1' || t.includes('confirm') || t.includes('yes')) {
+          const apt = await createAppointment(db, {
+            phone,
+            patient_name:      collectedData.patient_name,
+            date:              collectedData.selected_date,
+            time:              collectedData.selected_time,
+            payment_method:    collectedData.payment_method,
+            medical_aid:       collectedData.medical_aid || null,
+            membership_number: collectedData.membership_number || null,
+          });
 
-            const conversation = await getOrCreateConversation(db, phone);
-            let nextState = conversation.current_state;
-            const collectedData = conversation.collected_data || {};
+          await markSlotPending(db, collectedData.selected_slot_id, phone);
 
-            try {
-              if (nextState === 'initial') {
-                nextState = await handleInitialMessage(db, phone, text);
-              } else if (nextState === 'menu') {
-                nextState = await handleMenuSelection(db, phone, text);
-              } else if (nextState === 'selecting_date') {
-                nextState = await handleDateSelection(db, phone, text, collectedData);
-              } else if (nextState === 'selecting_time') {
-                nextState = await handleTimeSelection(db, phone, text, collectedData);
-              } else if (nextState === 'payment_method') {
-                nextState = await handlePaymentMethod(db, phone, text, collectedData);
-              } else if (nextState === 'medical_aid_select') {
-                nextState = await handleMedicalAidSelection(db, phone, text, collectedData);
-              } else if (nextState === 'membership_number') {
-                nextState = await handleMembershipNumber(db, phone, text, collectedData);
-              } else if (nextState === 'patient_name') {
-                nextState = await handlePatientName(db, phone, text, collectedData);
-              } else if (nextState === 'confirm_details') {
-                if (text.includes('✅') || text.includes('Confirm')) {
-                  const apt = await createAppointment(db, {
-                    phone,
-                    patient_name: collectedData.patient_name,
-                    date: collectedData.selected_date,
-                    time: collectedData.selected_time,
-                    payment_method: collectedData.payment_method,
-                    medical_aid: collectedData.medical_aid || null,
-                    membership_number: collectedData.membership_number || null,
-                  });
-
-                  await markSlotPending(db, collectedData.selected_slot_id, phone);
-
-                  await sendWhatsAppMessage(phone,
-                    `✅ Thank you ${collectedData.patient_name}! Your booking is pending doctor approval.\n\nYou will receive confirmation within 24 hours.`
-                  );
-                  nextState = 'complete';
-                } else if (text.includes('❌') || text.includes('Cancel')) {
-                  await sendWhatsAppMessage(phone, 'Booking cancelled. You can start over by sending "Hi".');
-                  nextState = 'initial';
-                }
-              }
-
-              await updateConversationState(db, phone, nextState, collectedData);
-            } catch (handlerErr) {
-              console.error(`Error handling message: ${handlerErr.message}`);
-              await sendWhatsAppMessage(phone, '❌ An error occurred. Please try again.');
-            }
-          }
+          await sendWhatsAppMessage(phone,
+            `Thank you ${collectedData.patient_name}! Your booking is pending doctor approval. You will receive confirmation within 24 hours.`
+          );
+          nextState = 'complete';
+        } else if (t === '2' || t.includes('cancel') || t.includes('no')) {
+          await sendWhatsAppMessage(phone, 'Booking cancelled. Send "Hi" to start over.');
+          nextState = 'initial';
         }
       }
-      return res.json({ success: true });
+
+      await updateConversationState(db, phone, nextState, collectedData);
+    } catch (handlerErr) {
+      console.error(`Handler error: ${handlerErr.message}`);
+      await sendWhatsAppMessage(phone, 'An error occurred. Please try again or send "Hi" to restart.');
     }
-    return res.status(400).json({ success: false, error: 'Invalid webhook payload' });
   } catch (err) {
     console.error('Webhook processing error:', err);
-    return res.status(500).json({ success: false, error: 'Server error' });
   }
+
+  // Twilio expects a 200 with empty TwiML or just 200
+  res.set('Content-Type', 'text/xml');
+  res.send('<Response></Response>');
 });
 
+// ── REST endpoints ────────────────────────────────────────────────────────────
 app.post('/confirm-appointment', authMiddleware, (req, res) => confirmAppointmentHandler(db, req, res));
 
 app.get('/services', async (req, res) => {
@@ -207,13 +195,13 @@ app.post('/book', async (req, res) => {
       date,
       time,
       payment_method: payment_method || 'cash',
-      medical_aid: medical_aid || null,
+      medical_aid:    medical_aid || null,
       membership_number: membership_number || null,
     });
     await db.collection('appointments').doc(apt.id).update({
-      source: 'website',
-      email: email || null,
-      reason: reason || null,
+      source:       'website',
+      email:        email || null,
+      reason:       reason || null,
       medical_plan: medical_plan || null,
     });
     return res.json({ success: true, appointmentId: apt.id });
@@ -223,6 +211,6 @@ app.post('/book', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => res.json({ ok: true, service: 'WhatsApp Booking System' }));
+app.get('/', (req, res) => res.json({ ok: true, service: 'WhatsApp Booking System (Twilio)' }));
 
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

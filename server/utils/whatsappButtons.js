@@ -1,54 +1,29 @@
-const axios = require('axios');
+const twilio = require('twilio');
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
+const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER; // e.g. +14155238886
 
-async function sendWhatsAppMessage(phone, text) {
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) throw new Error('WhatsApp config not set');
-
-  const url = `https://graph.facebook.com/v15.0/${WHATSAPP_PHONE_ID}/messages`;
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: phone,
-    text: { body: text },
-  };
-
-  const res = await axios.post(url, payload, {
-    headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
-    timeout: 10_000,
-  });
-
-  if (res.data.error) throw new Error(`WhatsApp API error: ${JSON.stringify(res.data.error)}`);
-  return res.data;
+function getClient() {
+  if (!ACCOUNT_SID || !AUTH_TOKEN) throw new Error('Twilio credentials not set');
+  return twilio(ACCOUNT_SID, AUTH_TOKEN);
 }
 
-async function sendWhatsAppButtons(phone, text, buttons) {
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) throw new Error('WhatsApp config not set');
-
-  const url = `https://graph.facebook.com/v15.0/${WHATSAPP_PHONE_ID}/messages`;
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: phone,
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      body: { text },
-      action: {
-        buttons: buttons.map((btn, idx) => ({
-          type: 'reply',
-          reply: { id: `btn_${idx}`, title: btn },
-        })),
-      },
-    },
-  };
-
-  const res = await axios.post(url, payload, {
-    headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
-    timeout: 10_000,
+async function sendWhatsAppMessage(phone, text) {
+  const client = getClient();
+  const msg = await client.messages.create({
+    from: `whatsapp:${FROM_NUMBER}`,
+    to:   `whatsapp:${phone}`,
+    body: text,
   });
+  return msg;
+}
 
-  if (res.data.error) throw new Error(`WhatsApp API error: ${JSON.stringify(res.data.error)}`);
-  return res.data;
+// Twilio sandbox doesn't support interactive buttons —
+// send a numbered-menu text instead so patients can reply "1", "2", etc.
+async function sendWhatsAppButtons(phone, prompt, buttons) {
+  const numbered = buttons.map((btn, i) => `${i + 1}. ${btn}`).join('\n');
+  return sendWhatsAppMessage(phone, `${prompt}\n\n${numbered}\n\nReply with the number of your choice.`);
 }
 
 module.exports = { sendWhatsAppMessage, sendWhatsAppButtons };

@@ -2,37 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // whatsapp_messages: only backend (Admin SDK) should write; deny client writes and reads
-    match /whatsapp_messages/{msgId} {
-      allow read: if false; // patients/callers should not read messages directly
-      allow create: if false; // backend Admin SDK bypasses rules, so deny client writes
-      allow update, delete: if false;
+    // Appointments — dashboard reads directly via client SDK
+    match /appointments/{apptId} {
+      allow read: if true;   // doctor dashboard reads live
+      allow write: if false; // only server (Admin SDK) writes
     }
 
-    // whatsapp_appointments: only authenticated doctors/managers can read/write
-    match /whatsapp_appointments/{apptId} {
-      allow read, write: if isDoctorOrManager();
-
-      function isDoctorOrManager() {
-        return request.auth != null && (request.auth.token.role == 'doctor' || request.auth.token.role == 'manager');
-      }
-
-      // Validate fields on create
-      allow create: if isDoctorOrManager() &&
-        request.resource.data.status in ['requested','in_progress','confirmed','rejected'] &&
-        request.resource.data.createdAt == request.time;
-
-      allow update: if isDoctorOrManager() &&
-        (request.resource.data.status in ['requested','in_progress','confirmed','rejected']);
+    // Conversation state — server only
+    match /patient_conversations/{phone} {
+      allow read, write: if false;
     }
 
-    // users collection: only doctors/managers can read/write, users can read their own doc
-    match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.role in ['doctor','manager']);
-      allow write: if request.auth != null && request.auth.token.role in ['doctor','manager'];
+    // Time slots — server only
+    match /time_slots/{slotId} {
+      allow read: if true;
+      allow write: if false;
     }
 
-    // default deny
+    // Services & medical aids — public read
+    match /services/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /medical_aids/{id} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Everything else — deny
     match /{document=**} {
       allow read, write: if false;
     }

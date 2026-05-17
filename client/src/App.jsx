@@ -3,11 +3,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import DoctorDashboard from './pages/DoctorDashboard';
 
 function App() {
-  return (
-    <div>
-      <DoctorDashboard />
-    </div>
-  );
+  return <DoctorDashboard />;
 }
 
 export default App;

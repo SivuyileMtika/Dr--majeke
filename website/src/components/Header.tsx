@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Settings, LogOut, Menu, X } from 'lucide-react';
-import homeBg from '../assets/home-bg.jpg';
-import '../App.css';
 
 interface HeaderProps {
   isAuthenticated?: boolean;
@@ -17,15 +15,9 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
 
   const closeMenu = () => setMenuOpen(false);
 
-  useEffect(() => {
-    document.documentElement.style.setProperty('--header-bg', `url(${homeBg})`);
-  }, []);
-
   return (
-    <header className="fixed top-0 left-0 w-full z-50 shadow-md header-bg">
-      {/* overlay keeps text readable */}
-      <div className="absolute inset-0 bg-white/88 backdrop-blur-[1px]" />
-      <div className="relative w-full h-12 flex items-center justify-between">
+    <header className="fixed top-0 left-0 w-full z-50 bg-white shadow-md">
+      <div className="w-full h-12 flex items-center justify-between">
 
         {/* Far LEFT: logo + title */}
         <div className="flex items-center gap-3 pl-2 flex-shrink-0">

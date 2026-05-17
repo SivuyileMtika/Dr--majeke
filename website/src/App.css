@@ -1,19 +1,30 @@
 /* Add your CSS selectors and rules here. For example: */
+
+.header-bg {
+  background-image: var(--header-bg);
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
 #home {
   position: relative;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  padding-top: 6rem;
-  padding-bottom: 6rem;
+  padding-top: 3rem; /* reduced */
+  padding-bottom: 3rem; /* reduced */
   padding-left: 1rem;
   padding-right: 1rem;
-  min-height: 60vh;
-  max-height: 100vh;
+  min-height: unset;
+  max-height: unset;
   display: flex;
   align-items: center;
-  width: 100vw;
+  width: 100%;
   box-sizing: border-box;
+  /* Add vendor prefix for box-sizing if supporting older browsers */
+  /* -webkit-box-sizing: border-box; */
+  background-size: cover;
+  background-position: center center;
 }
 
 /* Responsive adjustments */

@@ -3,5 +3,5 @@ builder = "nixpacks"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npx vite preview --host --port $PORT"
+startCommand = "node server.cjs"
 healthcheckPath = "/"

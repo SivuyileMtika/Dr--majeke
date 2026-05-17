@@ -322,7 +322,7 @@ function AppContent() {
               Passionate About Medicine.<br /><span className="bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">Compationate About People</span>
             </h2>
             <p className="text-sm md:text-xl lg:text-2xl text-gray-900 font-medium drop-shadow mb-6 md:mb-12 max-w-4xl mx-auto leading-relaxed">
-              Experience compassionate, comprehensive healthcare with <span className="blur-sm select-none">Dr. SG Majeke</span>.
+              Experience compassionate, comprehensive healthcare with <span className="">Dr. SG Majeke</span>.
               Your trusted family doctor providing personalized care for all ages.
             </p>
             <div className="flex flex-row gap-3 md:gap-6 justify-center items-center">
@@ -414,7 +414,7 @@ function AppContent() {
           <div className="text-center mb-12">
             <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">Book Your Consultation</h3>
             <p className="text-lg md:text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto">
-              Schedule your appointment with <span className="blur-sm select-none">Dr. SG Majeke</span> - easy, fast, and convenient
+              Schedule your appointment with <span className="">Dr. SG Majeke</span> - easy, fast, and convenient
             </p>
           </div>
 
@@ -803,7 +803,7 @@ function AppContent() {
           <div className="text-center mb-20">
             <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">Get In Touch</h3>
             <p className="text-lg md:text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto">
-              Contact <span className="blur-sm select-none">Dr. SG Majeke</span>'s practice for any questions or emergency consultations
+              Contact <span className="">Dr. SG Majeke</span>'s practice for any questions or emergency consultations
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -820,7 +820,7 @@ function AppContent() {
                 <Mail className="h-5 w-5 text-white" />
               </div>
               <h4 className="text-xs font-bold text-gray-900 mb-1">Mail</h4>
-              <p className="text-gray-700 text-xs font-semibold blur-sm select-none">dr@email.com</p>
+              <p className="text-gray-700 text-xs font-semibold ">dr@email.com</p>
               <p className="text-gray-500 text-xs mt-1">24hrs reply</p>
             </div>
             <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
@@ -844,7 +844,7 @@ function AppContent() {
             <div className="flex items-center gap-3">
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-12 w-12 object-contain" />
               <div>
-                <h5 className="font-bold text-white blur-sm select-none">Dr. SG Majeke</h5>
+                <h5 className="font-bold text-white ">Dr. SG Majeke</h5>
                 <p className="text-orange-400 text-xs">General Practitioner</p>
                 <p className="text-gray-500 text-xs">MBChB, Family Medicine</p>
               </div>
@@ -893,7 +893,7 @@ function AppContent() {
 
         {/* Bottom bar */}
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-gray-500 text-xs">&copy; 2025 <span className="blur-sm select-none">Dr. SG Majeke</span> General Practice. All rights reserved.</p>
+          <p className="text-gray-500 text-xs">&copy; 2025 <span className="">Dr. SG Majeke</span> General Practice. All rights reserved.</p>
           <p className="text-gray-600 text-xs">Built with care for the community.</p>
         </div>
       </footer>

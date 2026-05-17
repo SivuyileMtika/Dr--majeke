@@ -45,7 +45,7 @@ const SourceBadge = ({ source }) => (
     color: source === 'website' ? '#0ea5e9' : '#22c55e',
     border: `1px solid ${source === 'website' ? '#0ea5e955' : '#22c55e55'}`,
     borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600
-  }}>{source === 'website' ? '🌐 Web' : '💬 WhatsApp'}</span>
+  }}>{source === 'website' ? 'Web' : 'WhatsApp'}</span>
 );
 
 const formatTimestamp = ts => {
@@ -225,7 +225,7 @@ export default function DoctorDashboard() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #f97316, #ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 20 }}>🩺</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>+</span>
             </div>
             <div>
               <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>Dr. Majeke Clinic</div>
@@ -254,11 +254,11 @@ export default function DoctorDashboard() {
           {/* ── Stat Cards ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 28 }}>
             {[
-              { label: 'Total Bookings', value: stats.total, grad: 'linear-gradient(135deg,#6366f1,#8b5cf6)', icon: '📋' },
-              { label: 'Pending', value: stats.pending, grad: 'linear-gradient(135deg,#f59e0b,#f97316)', icon: '⏳' },
-              { label: 'Confirmed', value: stats.confirmed, grad: 'linear-gradient(135deg,#10b981,#059669)', icon: '✅' },
-              { label: 'Rejected', value: stats.rejected, grad: 'linear-gradient(135deg,#ef4444,#dc2626)', icon: '❌' },
-              { label: "Today", value: stats.today, grad: 'linear-gradient(135deg,#3b82f6,#2563eb)', icon: '📅' },
+              { label: 'Total Bookings', value: stats.total, grad: 'linear-gradient(135deg,#6366f1,#8b5cf6)', icon: '#' },
+              { label: 'Pending', value: stats.pending, grad: 'linear-gradient(135deg,#f59e0b,#f97316)', icon: '~' },
+              { label: 'Confirmed', value: stats.confirmed, grad: 'linear-gradient(135deg,#10b981,#059669)', icon: '+' },
+              { label: 'Rejected', value: stats.rejected, grad: 'linear-gradient(135deg,#ef4444,#dc2626)', icon: 'x' },
+              { label: "Today", value: stats.today, grad: 'linear-gradient(135deg,#3b82f6,#2563eb)', icon: '*' },
             ].map(s => (
               <div key={s.label} style={{ background: s.grad, borderRadius: 16, padding: '20px 18px', color: '#fff', boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
                 <div style={{ fontSize: 28, marginBottom: 4 }}>{s.icon}</div>
@@ -271,10 +271,10 @@ export default function DoctorDashboard() {
           {/* ── Tabs ── */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
             {[
-              { key: 'overview', label: '🏠 Overview' },
-              { key: 'calendar', label: '📅 Calendar' },
-              { key: 'table', label: '📊 All Bookings' },
-              { key: 'pending', label: `⏳ Pending${stats.pending ? ` (${stats.pending})` : ''}` },
+              { key: 'overview', label: 'Overview' },
+              { key: 'calendar', label: 'Calendar' },
+              { key: 'table', label: 'All Bookings' },
+              { key: 'pending', label: `Pending${stats.pending ? ` (${stats.pending})` : ''}` },
             ].map(t => (
               <button key={t.key} className={`dash-tab ${activeTab === t.key ? 'active' : ''}`} onClick={() => setActiveTab(t.key)}>
                 {t.label}
@@ -289,7 +289,7 @@ export default function DoctorDashboard() {
               {/* Today's schedule */}
               <div className="dash-card" style={{ padding: 24 }}>
                 <h6 style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 16 }}>
-                  📅 Today's Schedule — {now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}
+                  Today's Schedule — {now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}
                 </h6>
                 {getAppointmentsForDay(today).length === 0
                   ? <div style={{ color: '#94a3b8', textAlign: 'center', padding: '32px 0', fontSize: 14 }}>No appointments today</div>
@@ -311,7 +311,7 @@ export default function DoctorDashboard() {
 
               {/* Pending approvals */}
               <div className="dash-card" style={{ padding: 24 }}>
-                <h6 style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 16 }}>⏳ Needs Approval</h6>
+                <h6 style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 16 }}>Needs Approval</h6>
                 {appointments.filter(a => a.status === 'pending_approval').length === 0
                   ? <div style={{ color: '#94a3b8', textAlign: 'center', padding: '32px 0', fontSize: 14 }}>All clear — no pending approvals</div>
                   : appointments.filter(a => a.status === 'pending_approval')
@@ -345,7 +345,7 @@ export default function DoctorDashboard() {
 
               {/* Recent bookings */}
               <div className="dash-card" style={{ padding: 24, gridColumn: '1 / -1' }}>
-                <h6 style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 16 }}>🕐 Recent Bookings</h6>
+                <h6 style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 16 }}>Recent Bookings</h6>
                 {appointments.slice(0, 5).map(apt => (
                   <div key={apt.id} className="apt-row" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 8px', borderBottom: '1px solid #f1f5f9', borderRadius: 8 }}>
                     <Avatar name={apt.patient_name} />
@@ -393,7 +393,7 @@ export default function DoctorDashboard() {
                         onClick={() => setSelectedDay(isSel ? null : cell.dateStr)}>
                         <div className={`cal-day-num ${isToday ? 'today' : ''}`}>{cell.day}</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                          {clash && <span style={{ fontSize: 10, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '1px 4px', fontWeight: 700 }}>⚠</span>}
+                          {clash && <span style={{ fontSize: 10, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '1px 4px', fontWeight: 700 }}>!</span>}
                           {dayApts.filter(a => a.status === 'pending_approval').length > 0 &&
                             <span style={{ fontSize: 10, background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '1px 4px', fontWeight: 700 }}>
                               {dayApts.filter(a => a.status === 'pending_approval').length}P
@@ -411,7 +411,7 @@ export default function DoctorDashboard() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 12, height: 12, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 3, display: 'inline-block' }} /> Today</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: '#fef3c7', borderRadius: 4, padding: '0 4px', fontSize: 10, fontWeight: 700 }}>P</span> Pending</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: '#d1fae5', borderRadius: 4, padding: '0 4px', fontSize: 10, fontWeight: 700 }}>C</span> Confirmed</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: '#ef4444', borderRadius: 4, padding: '0 4px', fontSize: 10, fontWeight: 700, color: '#fff' }}>⚠</span> Time Clash</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: '#ef4444', borderRadius: 4, padding: '0 4px', fontSize: 10, fontWeight: 700, color: '#fff' }}>!</span> Time Clash</span>
                 </div>
               </div>
 
@@ -438,9 +438,9 @@ export default function DoctorDashboard() {
                           <StatusBadge status={apt.status} />
                         </div>
                         <div style={{ fontSize: 12, color: '#475569', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
-                          <span>⏰ {apt.time}</span>
-                          <span>💳 {apt.payment_method === 'medical_aid' ? 'Medical Aid' : 'Cash'}</span>
-                          {apt.medical_aid && <span style={{ gridColumn: '1/-1' }}>🏥 {apt.medical_aid} #{apt.membership_number}</span>}
+                          <span>Time: {apt.time}</span>
+                          <span>Payment: {apt.payment_method === 'medical_aid' ? 'Medical Aid' : 'Cash'}</span>
+                          {apt.medical_aid && <span style={{ gridColumn: '1/-1' }}>Aid: {apt.medical_aid} #{apt.membership_number}</span>}
                         </div>
                         <SourceBadge source={apt.source} />
                         {apt.status === 'pending_approval' && (
@@ -508,7 +508,7 @@ export default function DoctorDashboard() {
                           <div style={{ fontWeight: 600, color: '#1e293b' }}>{apt.date}</div>
                           <div style={{ color: '#f97316', fontWeight: 700, fontSize: 13 }}>{apt.time}</div>
                           {hasClash(apt.date) && apt.status !== 'rejected' &&
-                            <span style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>⚠ Clash</span>}
+                            <span style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>! Clash</span>}
                         </td>
                         <td style={{ padding: '12px 16px', fontSize: 13 }}>
                           {apt.payment_method === 'medical_aid'
@@ -543,7 +543,7 @@ export default function DoctorDashboard() {
             <div>
               {stats.pending === 0 && (
                 <div className="dash-card" style={{ padding: 48, textAlign: 'center' }}>
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                  <div style={{ fontSize: 48, marginBottom: 12, color: '#10b981', fontWeight: 800 }}>✓</div>
                   <div style={{ fontWeight: 700, fontSize: 18, color: '#1e293b', marginBottom: 6 }}>All clear!</div>
                   <div style={{ color: '#64748b' }}>No pending appointments to review.</div>
                 </div>
@@ -562,7 +562,7 @@ export default function DoctorDashboard() {
                             <SourceBadge source={apt.source} />
                           </div>
                           {hasClash(apt.date) && (
-                            <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700 }}>⚠ Clash</span>
+                            <span style={{ background: '#fee2e2', color: '#dc2626', borderRadius: 8, padding: '4px 8px', fontSize: 11, fontWeight: 700 }}>! Clash</span>
                           )}
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14, fontSize: 13 }}>

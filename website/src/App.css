@@ -1,11 +1,4 @@
 /* Add your CSS selectors and rules here. For example: */
-
-.header-bg {
-  background-image: var(--header-bg);
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-}
 #home {
   position: relative;
   background-size: cover;

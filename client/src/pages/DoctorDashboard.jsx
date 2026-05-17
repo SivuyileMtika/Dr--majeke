@@ -276,6 +276,9 @@ export default function DoctorDashboard() {
                             <div>
                               <div className="fw-bold">{apt.patient_name || 'Unknown'}</div>
                               <div className="text-muted small">{apt.phone}</div>
+                              <span className={`badge ${apt.source === 'website' ? 'bg-info' : 'bg-success'} small`}>
+                                {apt.source === 'website' ? '🌐 Website' : '💬 WhatsApp'}
+                              </span>
                             </div>
                             <span className={`badge bg-${STATUS_COLORS[apt.status]}`}>
                               {STATUS_LABELS[apt.status]}
@@ -357,7 +360,12 @@ export default function DoctorDashboard() {
                     )}
                     {filteredAppointments.map(apt => (
                       <tr key={apt.id}>
-                        <td className="fw-semibold">{apt.patient_name || 'Unknown'}</td>
+                        <td>
+                          <div className="fw-semibold">{apt.patient_name || 'Unknown'}</div>
+                          <span className={`badge ${apt.source === 'website' ? 'bg-info' : 'bg-success'} small`}>
+                            {apt.source === 'website' ? '🌐 Website' : '💬 WhatsApp'}
+                          </span>
+                        </td>
                         <td className="text-muted small">{apt.phone}</td>
                         <td>
                           <div>{apt.date}</div>

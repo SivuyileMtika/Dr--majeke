@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
               className="h-8 w-8 md:h-10 md:w-10 rounded-full object-cover flex-shrink-0"
             />
             <div className="leading-none overflow-hidden">
-              <div className="text-sm font-bold text-orange-700 truncate max-w-[8rem] sm:max-w-xs blur-sm select-none">
+              <div className="text-sm font-bold text-orange-700 truncate max-w-[8rem] sm:max-w-xs ">
                 Dr. SG Majeke
               </div>
               <div className="text-xs text-black truncate max-w-[8rem] sm:max-w-xs" style={{fontSize:'10px'}}>

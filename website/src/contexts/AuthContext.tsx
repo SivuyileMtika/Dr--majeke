@@ -35,7 +35,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    await new Promise(resolve => setTimeout(resolve, 800));
     const user = mockUsers.find(u => u.email === credentials.email && u.password === credentials.password);
     if (user) {
       const { password, ...userWithoutPassword } = user;
@@ -49,7 +48,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    await new Promise(resolve => setTimeout(resolve, 800));
     if (mockUsers.find(u => u.email === data.email)) {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return false;

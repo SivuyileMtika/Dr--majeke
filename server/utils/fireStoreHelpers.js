@@ -52,7 +52,6 @@ async function getAvailableSlots(db, date) {
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
-// Returns next ≤7 weekday dates that still have at least one available slot
 async function getAvailableDates(db) {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -75,7 +74,6 @@ async function getAvailableDates(db) {
     .slice(0, 7);
 }
 
-// Returns { 'YYYY-MM-DD': ['HH:MM', ...] } for all confirmed/pending appointments
 async function getBookedSlots(db) {
   const snap = await db.collection('appointments')
     .where('status', 'in', ['confirmed', 'pending_approval'])

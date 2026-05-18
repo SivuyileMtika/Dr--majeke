@@ -9,7 +9,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users database (in real app, this would be in a backend)
 const mockUsers: (User & { password: string })[] = [
   {
     id: '1',
@@ -30,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   useEffect(() => {
-    // Check for stored user session
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -80,14 +78,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Check if user already exists
     const existingUser = mockUsers.find(u => u.email === data.email);
     if (existingUser) {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return false;
     }
-    
-    // Create new user
+
     const newUser = {
       id: Date.now().toString(),
       name: data.name,

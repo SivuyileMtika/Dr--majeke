@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, Phone, Mail, MapPin, Heart, Shield, Stethoscope, CheckCircle, XCircle, Users, Award, Clock3, LogOut, Settings }from'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Clock, User, Phone, Mail, MapPin, Heart, Shield, Stethoscope, CheckCircle, Users, Award, Clock3 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { AdminPanel } from './components/AdminPanel';
-import { Appointment } from './types/auth';
-import'./App.css';
+import './App.css';
 import Header from './components/Header';
 import homeBg from './assets/home-bg.jpg';
 
@@ -28,13 +27,13 @@ interface BookingData {
 
 function AppContent() {
   const { user, isAuthenticated, logout } = useAuth();
-  const [showBookingSection, setShowBookingSection] = useState<boolean>(false);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [showBookingForm, setShowBookingForm] = useState<boolean>(false);
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [showBookingSection, setShowBookingSection] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [bookingData, setBookingData] = useState<BookingData>({
     date: '',
     time: '',
@@ -45,59 +44,9 @@ function AppContent() {
     paymentType: 'cash',
     medicalAid: '',
     medicalPlan: '',
-    membershipNumber: ''
+    membershipNumber: '',
   });
-  const [bookedSlots, setBookedSlots] = useState<string[]>([
-    '2025-01-15-09:00',
-    '2025-01-15-14:00',
-    '2025-01-16-10:30',
-    '2025-01-17-11:00',
-    '2025-01-18-09:30',
-    '2025-01-18-15:00'
-  ]);
-
-  // Load booked slots from appointments on component mount and when appointments change
-  useEffect(() => {
-    const loadBookedSlots = () => {
-      const storedAppointments = localStorage.getItem('appointments');
-      if (storedAppointments) {
-        const appointments: Appointment[] = JSON.parse(storedAppointments);
-        const approvedSlots = appointments
-          .filter(appointment => appointment.status === 'approved')
-          .map(appointment => `${appointment.date}-${appointment.time}`);
-        
-        // Combine with initial booked slots
-        const initialBookedSlots = [
-          '2025-01-15-09:00',
-          '2025-01-15-14:00',
-          '2025-01-16-10:30',
-          '2025-01-17-11:00',
-          '2025-01-18-09:30',
-          '2025-01-18-15:00'
-        ];
-        
-        const allBookedSlots = [...new Set([...initialBookedSlots, ...approvedSlots])];
-        setBookedSlots(allBookedSlots);
-      }
-    };
-
-    loadBookedSlots();
-    
-    // Listen for storage changes to update booked slots when appointments are approved
-    const handleStorageChange = () => {
-      loadBookedSlots();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check for changes periodically (for same-tab updates)
-    const interval = setInterval(loadBookedSlots, 1000);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
   const timeSlots: TimeSlot[] = [
     { time: '08:00', available: true },
@@ -113,7 +62,7 @@ function AppContent() {
     { time: '15:00', available: true },
     { time: '15:30', available: true },
     { time: '16:00', available: true },
-    { time: '16:30', available: true }
+    { time: '16:30', available: true },
   ];
 
   const getAvailableDates = () => {
@@ -122,20 +71,17 @@ function AppContent() {
     for (let i = 1; i <= 14; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
-      if (date.getDay() !== 0 && date.getDay() !== 6) { // Exclude weekends
+      if (date.getDay() !== 0 && date.getDay() !== 6) {
         dates.push(date.toISOString().split('T')[0]);
       }
     }
     return dates;
   };
 
-  const isSlotBooked = (date: string, time: string) => {
-    return bookedSlots.includes(`${date}-${time}`);
-  };
+  const isSlotBooked = (date: string, time: string) => bookedSlots.includes(`${date}-${time}`);
 
-  const getAvailableSlotsForDate = (date: string) => {
-    return timeSlots.filter(slot => !isSlotBooked(date, slot.time)).length;
-  };
+  const getAvailableSlotsForDate = (date: string) =>
+    timeSlots.filter(slot => !isSlotBooked(date, slot.time)).length;
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
@@ -149,16 +95,15 @@ function AppContent() {
       setShowAuthModal(true);
       return;
     }
-    
     if (!isSlotBooked(selectedDate, time)) {
       setSelectedTime(time);
-      setBookingData({ 
-        ...bookingData, 
-        date: selectedDate, 
+      setBookingData({
+        ...bookingData,
+        date: selectedDate,
         time,
         name: user?.name || '',
         email: user?.email || '',
-        phone: user?.phone || ''
+        phone: user?.phone || '',
       });
       setShowBookingForm(true);
     }
@@ -166,22 +111,21 @@ function AppContent() {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const API_BASE = import.meta.env.VITE_API_URL || 'https://dr-majeke-production.up.railway.app';
       const res = await fetch(`${API_BASE}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patient_name: bookingData.name,
-          phone: bookingData.phone,
-          email: bookingData.email,
-          date: bookingData.date,
-          time: bookingData.time,
-          reason: bookingData.reason,
-          payment_method: bookingData.paymentType === 'medical' ? 'medical_aid' : 'cash',
-          medical_aid: bookingData.medicalAid || null,
-          medical_plan: bookingData.medicalPlan || null,
+          patient_name:      bookingData.name,
+          phone:             bookingData.phone,
+          email:             bookingData.email,
+          date:              bookingData.date,
+          time:              bookingData.time,
+          reason:            bookingData.reason,
+          payment_method:    bookingData.paymentType === 'medical' ? 'medical_aid' : 'cash',
+          medical_aid:       bookingData.medicalAid || null,
+          medical_plan:      bookingData.medicalPlan || null,
           membership_number: bookingData.membershipNumber || null,
         }),
       });
@@ -198,101 +142,35 @@ function AppContent() {
     setSelectedDate('');
     setSelectedTime('');
     setBookingData({
-      date: '',
-      time: '',
-      name: '',
-      email: '',
-      phone: '',
-      reason: '',
-      paymentType: 'cash',
-      medicalAid: '',
-      medicalPlan: '',
-      membershipNumber: ''
+      date: '', time: '', name: '', email: '', phone: '',
+      reason: '', paymentType: 'cash', medicalAid: '', medicalPlan: '', membershipNumber: '',
     });
   };
 
-  // South African Medical Aid providers and their plans
-  const medicalAidProviders = {
-    'Discovery Health': [
-      'Discovery Health Essential',
-      'Discovery Health Classic',
-      'Discovery Health Comprehensive',
-      'Discovery Health Executive'
-    ],
-    'Momentum Health': [
-      'Momentum Health Ingwe',
-      'Momentum Health Myriad',
-      'Momentum Health Summit',
-      'Momentum Health Custom'
-    ],
-    'Bonitas': [
-      'Bonitas Standard',
-      'Bonitas Primary',
-      'Bonitas Select',
-      'Bonitas BonCap',
-      'Bonitas BonEssential'
-    ],
-    'Medshield': [
-      'Medshield MediValue',
-      'Medshield MediBonus',
-      'Medshield MediCore',
-      'Medshield MediElite'
-    ],
-    'Bestmed': [
-      'Bestmed Beat 1',
-      'Bestmed Beat 2',
-      'Bestmed Beat 3',
-      'Bestmed Pace 1',
-      'Bestmed Pace 2'
-    ],
-    'Gems': [
-      'Gems Emerald',
-      'Gems Ruby',
-      'Gems Diamond',
-      'Gems Sapphire'
-    ],
-    'Keyhealth': [
-      'Keyhealth Starter',
-      'Keyhealth Access',
-      'Keyhealth Elevate',
-      'Keyhealth Comprehensive'
-    ],
-    'Fedhealth': [
-      'Fedhealth Maxima Exec',
-      'Fedhealth Maxima Entrant',
-      'Fedhealth Maxima Traditional',
-      'Fedhealth Flexifed'
-    ],
-    'Profmed': [
-      'Profmed Compcare',
-      'Profmed Pinnacle',
-      'Profmed Plus',
-      'Profmed Primary'
-    ],
-    'Other': [
-      'Please specify in reason for visit'
-    ]
+  const medicalAidProviders: Record<string, string[]> = {
+    'Discovery Health': ['Discovery Health Essential', 'Discovery Health Classic', 'Discovery Health Comprehensive', 'Discovery Health Executive'],
+    'Momentum Health':  ['Momentum Health Ingwe', 'Momentum Health Myriad', 'Momentum Health Summit', 'Momentum Health Custom'],
+    'Bonitas':          ['Bonitas Standard', 'Bonitas Primary', 'Bonitas Select', 'Bonitas BonCap', 'Bonitas BonEssential'],
+    'Medshield':        ['Medshield MediValue', 'Medshield MediBonus', 'Medshield MediCore', 'Medshield MediElite'],
+    'Bestmed':          ['Bestmed Beat 1', 'Bestmed Beat 2', 'Bestmed Beat 3', 'Bestmed Pace 1', 'Bestmed Pace 2'],
+    'Gems':             ['Gems Emerald', 'Gems Ruby', 'Gems Diamond', 'Gems Sapphire'],
+    'Keyhealth':        ['Keyhealth Starter', 'Keyhealth Access', 'Keyhealth Elevate', 'Keyhealth Comprehensive'],
+    'Fedhealth':        ['Fedhealth Maxima Exec', 'Fedhealth Maxima Entrant', 'Fedhealth Maxima Traditional', 'Fedhealth Flexifed'],
+    'Profmed':          ['Profmed Compcare', 'Profmed Pinnacle', 'Profmed Plus', 'Profmed Primary'],
+    'Other':            ['Please specify in reason for visit'],
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    return date.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
-
 
   if (showAdminPanel && user?.role === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
   }
 
   return (
-    // add top padding so content sits below fixed header (h-16)
     <div className="pt-12 min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
-      {/* Use shared Header across all pages */}
       <Header
         isAuthenticated={isAuthenticated}
         user={user}
@@ -302,13 +180,11 @@ function AppContent() {
         onAdminToggle={() => setShowAdminPanel(!showAdminPanel)}
       />
 
-      {/* Hero Section */}
+      <style>{`.home-hero-bg { background-image: url(${homeBg}); }`}</style>
       <section
         id="home"
         className="relative bg-cover bg-center bg-no-repeat py-10 md:py-24 px-4 sm:px-6 lg:px-8 flex items-start md:items-center home-hero-bg"
-        style={{ backgroundImage: `url(${homeBg})` }}
       >
-        {/* Overlay for readability */}
         <div className="absolute inset-0 bg-white/25"></div>
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="text-center">
@@ -319,10 +195,10 @@ function AppContent() {
               </div>
             </div>
             <h2 className="text-xl md:text-4xl font-bold text-gray-950 drop-shadow mb-3 md:mb-8">
-              Passionate About Medicine.<br /><span className="bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">Compationate About People</span>
+              Passionate About Medicine.<br /><span className="bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">Compassionate About People</span>
             </h2>
             <p className="text-sm md:text-xl lg:text-2xl text-gray-900 font-medium drop-shadow mb-6 md:mb-12 max-w-4xl mx-auto leading-relaxed">
-              Experience compassionate, comprehensive healthcare with <span className="">Dr. SG Majeke</span>.
+              Experience compassionate, comprehensive healthcare with Dr. SG Majeke.
               Your trusted family doctor providing personalized care for all ages.
             </p>
             <div className="flex flex-row gap-3 md:gap-6 justify-center items-center">
@@ -343,7 +219,6 @@ function AppContent() {
         </div>
       </section>
 
-      {/* Stats Section */}
       <section className="py-16 bg-gradient-to-r from-gray-900 to-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -372,7 +247,6 @@ function AppContent() {
         </div>
       </section>
 
-      {/* Services Section */}
       <section id="services" className="py-10 md:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 md:mb-20">
@@ -381,7 +255,6 @@ function AppContent() {
               Comprehensive healthcare services tailored to meet your individual and family needs
             </p>
           </div>
-          {/* horizontal scroll on mobile, 3-col grid on md+ */}
           <div className="flex overflow-x-auto gap-4 pb-2 md:pb-0 md:grid md:grid-cols-3 md:gap-10 snap-x snap-mandatory">
             <div className="flex-shrink-0 w-72 md:w-auto snap-start bg-gradient-to-br from-orange-50 to-orange-100 p-6 md:p-10 rounded-3xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 border-2 border-orange-200">
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center mb-4 md:mb-8 shadow-lg">
@@ -408,13 +281,12 @@ function AppContent() {
         </div>
       </section>
 
-      {/* Booking Section */}
       <section id="booking" className="py-24 bg-gradient-to-br from-gray-50 to-orange-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">Book Your Consultation</h3>
             <p className="text-lg md:text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto">
-              Schedule your appointment with <span className="">Dr. SG Majeke</span> - easy, fast, and convenient
+              Schedule your appointment with Dr. SG Majeke — easy, fast, and convenient
             </p>
           </div>
 
@@ -430,7 +302,7 @@ function AppContent() {
                     Take the first step towards better health. Our easy booking system lets you choose your preferred date and time.
                   </p>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-3 mb-6">
                   <div className="text-center p-2">
                     <div className="bg-orange-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -464,19 +336,13 @@ function AppContent() {
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                       <button
-                        onClick={() => {
-                          setAuthModalMode('login');
-                          setShowAuthModal(true);
-                        }}
+                        onClick={() => { setAuthModalMode('login'); setShowAuthModal(true); }}
                         className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-300 shadow-lg"
                       >
                         Sign In to Book
                       </button>
                       <button
-                        onClick={() => {
-                          setAuthModalMode('register');
-                          setShowAuthModal(true);
-                        }}
+                        onClick={() => { setAuthModalMode('register'); setShowAuthModal(true); }}
                         className="border-2 border-orange-500 text-orange-600 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-orange-500 hover:text-white transition-all duration-300"
                       >
                         Create Account
@@ -510,23 +376,21 @@ function AppContent() {
                 {!isAuthenticated && (
                   <div className="bg-orange-100 rounded-2xl p-6 border-2 border-orange-200 max-w-2xl mx-auto">
                     <p className="text-orange-800 font-semibold text-lg">
-                      Please <button 
-                        onClick={() => {
-                          setAuthModalMode('register');
-                          setShowAuthModal(true);
-                        }}
+                      Please{' '}
+                      <button
+                        onClick={() => { setAuthModalMode('register'); setShowAuthModal(true); }}
                         className="text-orange-600 underline hover:text-orange-700"
                       >
                         register
-                      </button> or <button 
-                        onClick={() => {
-                          setAuthModalMode('login');
-                          setShowAuthModal(true);
-                        }}
+                      </button>{' '}
+                      or{' '}
+                      <button
+                        onClick={() => { setAuthModalMode('login'); setShowAuthModal(true); }}
                         className="text-orange-600 underline hover:text-orange-700"
                       >
                         sign in
-                      </button> to book an appointment
+                      </button>{' '}
+                      to book an appointment
                     </p>
                   </div>
                 )}
@@ -534,7 +398,6 @@ function AppContent() {
 
               <div className="max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Date Selection */}
                   <div className="bg-white rounded-2xl shadow-md p-4 border border-orange-100">
                     <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center">
                       <Calendar className="h-5 w-5 text-orange-600 mr-2" />
@@ -543,8 +406,7 @@ function AppContent() {
                     <div className="grid grid-cols-2 gap-2">
                       {getAvailableDates().map((date) => {
                         const availableSlots = getAvailableSlotsForDate(date);
-                        const isFullyBooked = availableSlots === 0;
-                        
+                        const isFullyBooked  = availableSlots === 0;
                         return (
                           <button
                             key={date}
@@ -559,23 +421,21 @@ function AppContent() {
                             }`}
                           >
                             <div className="font-bold text-xs">
-                              {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {new Date(date).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' })}
                             </div>
                             <div className="text-xs opacity-75">
-                              {new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}
+                              {new Date(date).toLocaleDateString('en-ZA', { weekday: 'short' })}
                             </div>
-                            {isFullyBooked ? (
-                              <div className="text-xs text-red-500 font-bold">Full</div>
-                            ) : (
-                              <div className="text-xs text-orange-500 font-semibold">{availableSlots} slots</div>
-                            )}
+                            {isFullyBooked
+                              ? <div className="text-xs text-red-500 font-bold">Full</div>
+                              : <div className="text-xs text-orange-500 font-semibold">{availableSlots} slots</div>
+                            }
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Time Selection */}
                   <div className="bg-white rounded-2xl shadow-md p-4 border border-orange-100">
                     <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center">
                       <Clock className="h-5 w-5 text-orange-600 mr-2" />
@@ -617,7 +477,6 @@ function AppContent() {
                   </div>
                 </div>
 
-                {/* Booking Form */}
                 {showBookingForm && isAuthenticated && (
                   <div className="mt-4 bg-white rounded-2xl shadow-md p-4 border border-orange-100">
                     <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center">
@@ -676,25 +535,14 @@ function AppContent() {
                         />
                       </div>
 
-                      {/* Payment Section */}
                       <div className="border-t border-gray-200 pt-3">
                         <h5 className="text-sm font-bold text-gray-900 mb-2">Payment Information</h5>
-                        
-                        {/* Payment Type Selection */}
                         <div className="mb-6">
-                          <label className="block text-lg font-bold text-gray-700 mb-3">
-                            Payment Method *
-                          </label>
+                          <label className="block text-lg font-bold text-gray-700 mb-3">Payment Method *</label>
                           <div className="grid grid-cols-2 gap-4">
                             <button
                               type="button"
-                              onClick={() => setBookingData({ 
-                                ...bookingData, 
-                                paymentType: 'cash',
-                                medicalAid: '',
-                                medicalPlan: '',
-                                membershipNumber: ''
-                              })}
+                              onClick={() => setBookingData({ ...bookingData, paymentType: 'cash', medicalAid: '', medicalPlan: '', membershipNumber: '' })}
                               className={`py-3 px-2 rounded-xl border-2 transition-all duration-300 text-center ${
                                 bookingData.paymentType === 'cash'
                                   ? 'bg-green-600 text-white border-green-600 shadow-lg'
@@ -719,7 +567,6 @@ function AppContent() {
                           </div>
                         </div>
 
-                        {/* Medical Aid Details */}
                         {bookingData.paymentType === 'medical' && (
                           <div className="space-y-2 bg-blue-50 p-3 rounded-xl border border-blue-200">
                             <div className="grid grid-cols-2 gap-2">
@@ -728,7 +575,6 @@ function AppContent() {
                                 <select
                                   id="medicalAidProvider"
                                   required
-                                  aria-label="Medical Aid Provider"
                                   value={bookingData.medicalAid}
                                   onChange={(e) => setBookingData({ ...bookingData, medicalAid: e.target.value, medicalPlan: '' })}
                                   className="w-full p-2 border border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-xs bg-white"
@@ -741,17 +587,16 @@ function AppContent() {
                               </div>
                               {bookingData.medicalAid && (
                                 <div>
-                                  <label className="block text-xs font-bold text-gray-700 mb-1">Plan *</label>
+                                  <label htmlFor="medicalPlan" className="block text-xs font-bold text-gray-700 mb-1">Plan *</label>
                                   <select
                                     id="medicalPlan"
                                     required
-                                    aria-label="Medical Aid Plan"
                                     value={bookingData.medicalPlan}
                                     onChange={(e) => setBookingData({ ...bookingData, medicalPlan: e.target.value })}
                                     className="w-full p-2 border border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-xs bg-white"
                                   >
                                     <option value="">Select plan</option>
-                                    {medicalAidProviders[bookingData.medicalAid as keyof typeof medicalAidProviders]?.map((plan) => (
+                                    {medicalAidProviders[bookingData.medicalAid]?.map((plan) => (
                                       <option key={plan} value={plan}>{plan}</option>
                                     ))}
                                   </select>
@@ -772,7 +617,7 @@ function AppContent() {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex flex-row gap-3 items-center">
                         <button
                           type="submit"
@@ -797,13 +642,12 @@ function AppContent() {
         </div>
       </section>
 
-      {/* Contact Section */}
       <section id="contact" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
             <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">Get In Touch</h3>
             <p className="text-lg md:text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto">
-              Contact <span className="">Dr. SG Majeke</span>'s practice for any questions or emergency consultations
+              Contact Dr. SG Majeke's practice for any questions or emergency consultations
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -813,15 +657,15 @@ function AppContent() {
               </div>
               <h4 className="text-xs font-bold text-gray-900 mb-1">Phone</h4>
               <p className="text-gray-700 text-xs font-semibold">089 255 0069</p>
-              <p className="text-gray-500 text-xs mt-1">8am-5pm</p>
+              <p className="text-gray-500 text-xs mt-1">8am–5pm</p>
             </div>
             <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200">
               <div className="bg-gradient-to-r from-gray-700 to-gray-800 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 shadow">
                 <Mail className="h-5 w-5 text-white" />
               </div>
-              <h4 className="text-xs font-bold text-gray-900 mb-1">Mail</h4>
-              <p className="text-gray-700 text-xs font-semibold ">dr@email.com</p>
-              <p className="text-gray-500 text-xs mt-1">24hrs reply</p>
+              <h4 className="text-xs font-bold text-gray-900 mb-1">Email</h4>
+              <p className="text-gray-700 text-xs font-semibold">dr@email.com</p>
+              <p className="text-gray-500 text-xs mt-1">24hr reply</p>
             </div>
             <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 shadow">
@@ -835,16 +679,13 @@ function AppContent() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gray-950 text-white">
-        {/* Top footer */}
         <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-8 border-b border-gray-800">
-          {/* Brand */}
           <div className="flex flex-col items-start gap-3">
             <div className="flex items-center gap-3">
               <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-12 w-12 object-contain" />
               <div>
-                <h5 className="font-bold text-white ">Dr. SG Majeke</h5>
+                <h5 className="font-bold text-white">Dr. SG Majeke</h5>
                 <p className="text-orange-400 text-xs">General Practitioner</p>
                 <p className="text-gray-500 text-xs">MBChB, Family Medicine</p>
               </div>
@@ -854,7 +695,6 @@ function AppContent() {
             </p>
           </div>
 
-          {/* Quick Links */}
           <div>
             <h6 className="text-orange-400 font-semibold text-sm mb-3 uppercase tracking-widest">Quick Links</h6>
             <ul className="space-y-2 text-sm text-gray-400">
@@ -865,47 +705,39 @@ function AppContent() {
             </ul>
           </div>
 
-          {/* Social & Contact */}
           <div>
             <h6 className="text-orange-400 font-semibold text-sm mb-3 uppercase tracking-widest">Connect</h6>
             <div className="flex gap-3 mb-4">
-              {/* Facebook */}
               <a href="#" aria-label="Facebook" className="bg-gray-800 hover:bg-blue-600 p-2 rounded-lg transition-colors">
                 <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.886v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
               </a>
-              {/* Instagram */}
               <a href="#" aria-label="Instagram" className="bg-gray-800 hover:bg-pink-600 p-2 rounded-lg transition-colors">
                 <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
               </a>
-              {/* X / Twitter */}
               <a href="#" aria-label="X" className="bg-gray-800 hover:bg-black p-2 rounded-lg transition-colors">
                 <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               </a>
-              {/* LinkedIn */}
               <a href="#" aria-label="LinkedIn" className="bg-gray-800 hover:bg-blue-700 p-2 rounded-lg transition-colors">
                 <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
               </a>
             </div>
-            <p className="text-gray-400 text-xs">📞 089 255 0069</p>
+            <p className="text-gray-400 text-xs">089 255 0069</p>
             <p className="text-gray-400 text-xs mt-1">Mon – Fri: 08:00 – 17:00</p>
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-gray-500 text-xs">&copy; 2025 <span className="">Dr. SG Majeke</span> General Practice. All rights reserved.</p>
+          <p className="text-gray-500 text-xs">&copy; 2025 Dr. SG Majeke General Practice. All rights reserved.</p>
           <p className="text-gray-600 text-xs">Built with care for the community.</p>
         </div>
       </footer>
 
-      {/* Auth Modal */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         initialMode={authModalMode}
       />
 
-      {/* Floating WhatsApp Button */}
       <a
         href="https://wa.me/27834289828"
         target="_blank"

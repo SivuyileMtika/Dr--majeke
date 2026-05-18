@@ -19,7 +19,6 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
     <header className="fixed top-0 left-0 w-full z-50 bg-white shadow-md">
       <div className="w-full h-12 flex items-center justify-between">
 
-        {/* Far LEFT: logo + title */}
         <div className="flex items-center gap-3 pl-2 flex-shrink-0">
           <a href="#home" className="flex items-center gap-3" onClick={closeMenu}>
             <img
@@ -31,17 +30,16 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
               <div className="text-sm font-bold text-orange-700 truncate max-w-[8rem] sm:max-w-xs ">
                 Dr. SG Majeke
               </div>
-              <div className="text-xs text-black truncate max-w-[8rem] sm:max-w-xs" style={{fontSize:'10px'}}>
+              <div className="text-xs text-black truncate max-w-[8rem] sm:max-w-xs text-[10px]">
                 General Practitioner
               </div>
-              <div className="text-orange-500 truncate max-w-[8rem] sm:max-w-xs" style={{fontSize:'10px'}}>
+              <div className="text-orange-500 truncate max-w-[8rem] sm:max-w-xs text-[10px]">
                 MBChB, Family Medicine
               </div>
             </div>
           </a>
         </div>
 
-        {/* CENTER: Nav links — desktop only */}
         <nav className="hidden md:flex flex-1 justify-center items-center gap-6" aria-label="Main navigation">
           <a href="#home" className="text-gray-700 hover:text-orange-600 font-medium text-sm">Home</a>
           <a href="#services" className="text-gray-700 hover:text-orange-600 font-medium text-sm">Services</a>
@@ -49,10 +47,7 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
           <a href="#contact" className="text-gray-700 hover:text-orange-600 font-medium text-sm">Contact</a>
         </nav>
 
-        {/* Far RIGHT: auth buttons (desktop) + hamburger (mobile) */}
         <div className="flex items-center gap-2 pr-2 flex-shrink-0">
-
-          {/* Hello greeting — always visible when authenticated */}
           {isAuthenticated && (
             <div className="flex flex-col text-right leading-tight mr-1">
               <span className="text-sm font-semibold text-gray-900">Hello, {user?.role === 'admin' ? 'Admin' : user?.name}</span>
@@ -60,7 +55,6 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
             </div>
           )}
 
-          {/* Auth buttons — desktop only */}
           <div className="hidden md:flex items-center gap-2">
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
@@ -105,7 +99,6 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
             )}
           </div>
 
-          {/* Hamburger button — mobile only */}
           <button
             type="button"
             className="md:hidden p-2 rounded hover:bg-gray-100"
@@ -120,17 +113,13 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
         </div>
       </div>
 
-      {/* Mobile dropdown */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200 shadow-lg px-4 py-4 flex flex-col gap-3">
-
-          {/* Nav links */}
           <a href="#home" onClick={closeMenu} className="text-gray-700 hover:text-orange-600 font-medium py-2 border-b border-gray-100">Home</a>
           <a href="#services" onClick={closeMenu} className="text-gray-700 hover:text-orange-600 font-medium py-2 border-b border-gray-100">Services</a>
           <a href="#booking" onClick={closeMenu} className="text-gray-700 hover:text-orange-600 font-medium py-2 border-b border-gray-100">Book</a>
           <a href="#contact" onClick={closeMenu} className="text-gray-700 hover:text-orange-600 font-medium py-2 border-b border-gray-100">Contact</a>
 
-          {/* Auth section */}
           {isAuthenticated ? (
             <div className="pt-2 flex flex-col gap-2">
               {user?.role === 'admin' && (

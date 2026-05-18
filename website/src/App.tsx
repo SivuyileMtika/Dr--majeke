@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Calendar, Clock, User, Phone, Mail, MapPin, Heart, Shield, Stethoscope, CheckCircle, Users, Award, Clock3 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
@@ -46,6 +46,15 @@ function AppContent() {
   });
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
+  const timeRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
+
   const timeSlots: TimeSlot[] = [
     { time: '08:00', available: true },
     { time: '08:30', available: true },
@@ -85,6 +94,7 @@ function AppContent() {
     setSelectedDate(date);
     setSelectedTime('');
     setShowBookingForm(false);
+    scrollTo(timeRef);
   };
 
   const handleTimeSelect = (time: string) => {
@@ -104,6 +114,7 @@ function AppContent() {
         phone: user?.phone || '',
       });
       setShowBookingForm(true);
+      scrollTo(formRef);
     }
   };
 
@@ -429,7 +440,7 @@ function AppContent() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl shadow-md p-4 border border-orange-100">
+                  <div ref={timeRef} className="bg-white rounded-2xl shadow-md p-4 border border-orange-100 scroll-mt-16">
                     <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center">
                       <Clock className="h-5 w-5 text-orange-600 mr-2" />
                       Select Time
@@ -471,7 +482,7 @@ function AppContent() {
                 </div>
 
                 {showBookingForm && isAuthenticated && (
-                  <div className="mt-4 bg-white rounded-2xl shadow-md p-4 border border-orange-100">
+                  <div ref={formRef} className="mt-4 bg-white rounded-2xl shadow-md p-4 border border-orange-100 scroll-mt-16">
                     <h4 className="text-base font-bold text-gray-900 mb-3 flex items-center">
                       <User className="h-5 w-5 text-orange-600 mr-2" />
                       Patient Information

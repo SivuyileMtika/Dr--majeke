@@ -9,8 +9,10 @@ const {
   updateConversationState,
   createAppointment,
   markSlotPending,
+  getServices,
+  getMedicalAids,
+  getBookedSlots,
 } = require('./utils/fireStoreHelpers');
-const { getServices, getMedicalAids } = require('./utils/fireStoreHelpers');
 const {
   handleInitialMessage,
   handleMenuSelection,
@@ -46,7 +48,8 @@ try {
 
   seedMedicalAids(db).catch(e => console.warn('Medical aids seeding warning:', e.message));
   seedServices(db).catch(e => console.warn('Services seeding warning:', e.message));
-  seedTimeSlots(db).catch(e => console.warn('Time slots seeding warning:', e.message));
+  // 15 days, 08:00–17:00, 30-min slots — covers the website's 14-day booking window
+  seedTimeSlots(db, 15, 8, 17, 30).catch(e => console.warn('Time slots seeding warning:', e.message));
 } catch (err) {
   console.error('Failed to initialize Firebase Admin:', err.message);
   process.exit(1);
@@ -169,12 +172,34 @@ app.get('/medical-aids', async (req, res) => {
   }
 });
 
+app.get('/booked-slots', async (req, res) => {
+  try {
+    const data = await getBookedSlots(db);
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('booked-slots error:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 app.post('/book', async (req, res) => {
   try {
     const { patient_name, phone, email, date, time, reason, payment_method, medical_aid, medical_plan, membership_number } = req.body || {};
     if (!patient_name || !phone || !date || !time) {
       return res.status(400).json({ success: false, error: 'Missing required fields: patient_name, phone, date, time' });
     }
+
+    // Reject if this slot is already confirmed — first-come, first-served
+    const conflict = await db.collection('appointments')
+      .where('date', '==', date)
+      .where('time', '==', time)
+      .where('status', '==', 'confirmed')
+      .limit(1)
+      .get();
+    if (!conflict.empty) {
+      return res.status(409).json({ success: false, error: 'This time slot is already booked. Please choose another time.' });
+    }
+
     const apt = await createAppointment(db, {
       phone,
       patient_name,

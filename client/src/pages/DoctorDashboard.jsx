@@ -101,6 +101,8 @@ export default function DoctorDashboard() {
   const [search, setSearch]               = useState('');
   const [actionLoading, setActionLoading] = useState({});
   const [actionError, setActionError]     = useState({});
+  const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
+  const autoProcessedRef = React.useRef(new Set());
   const [selectedDay, setSelectedDay]     = useState(null);
   const [month, setMonth]                 = useState(new Date());
   const [sortField, setSortField]         = useState('date');
@@ -111,6 +113,31 @@ export default function DoctorDashboard() {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
+
+  // Persist auto-pilot preference
+  useEffect(() => {
+    localStorage.setItem('autopilot', autoPilot);
+  }, [autoPilot]);
+
+  // Auto-pilot: approve first-come, reject duplicates
+  useEffect(() => {
+    if (!autoPilot || appointments.length === 0) return;
+    const pending = appointments.filter(a => a.status === 'pending_approval');
+    pending.forEach((apt, idx) => {
+      if (autoProcessedRef.current.has(apt.id)) return;
+      autoProcessedRef.current.add(apt.id);
+      // Stagger each action 800ms apart to avoid race conditions
+      setTimeout(() => {
+        const conflict = appointments.some(
+          a => a.id !== apt.id &&
+               a.date === apt.date &&
+               a.time === apt.time &&
+               a.status === 'confirmed'
+        );
+        handleAction(apt.id, !conflict);
+      }, idx * 800);
+    });
+  }, [appointments, autoPilot]);
 
   useEffect(() => {
     if (!AUTH_TOKEN) { setError('REACT_APP_DOCTOR_TOKEN not configured'); setLoading(false); return; }
@@ -233,6 +260,13 @@ export default function DoctorDashboard() {
 
     .hide-mobile { }
 
+    .autopilot-btn { display: flex; align-items: center; gap: 6px; border: none; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: .3px; }
+    .autopilot-btn.on  { background: ${P.green};    color: #fff; box-shadow: 0 0 0 3px ${P.greenLight}; }
+    .autopilot-btn.off { background: ${P.slate100}; color: ${P.slate600}; }
+    .autopilot-btn.on .ap-dot  { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: pulse 1.4s infinite; }
+    .autopilot-btn.off .ap-dot { width: 7px; height: 7px; border-radius: 50%; background: ${P.slate400}; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
     input:focus { outline: 2px solid ${P.orange}; outline-offset: 1px; }
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-thumb { background: ${P.slate200}; border-radius: 4px; }
@@ -286,6 +320,18 @@ export default function DoctorDashboard() {
             </div>
           </div>
           <div className="dash-header-right">
+            <button
+              type="button"
+              className={`autopilot-btn ${autoPilot ? 'on' : 'off'}`}
+              onClick={() => {
+                if (!autoPilot) autoProcessedRef.current.clear();
+                setAutoPilot(p => !p);
+              }}
+              title={autoPilot ? 'Auto Pilot is ON — click to disable' : 'Enable Auto Pilot to auto-approve bookings'}
+            >
+              <span className="ap-dot" />
+              Auto Pilot {autoPilot ? 'ON' : 'OFF'}
+            </button>
             {stats.pending > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: P.amberLight, border: `1px solid #fcd34d`, borderRadius: 6, padding: '4px 10px' }}>
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: P.amber }} />

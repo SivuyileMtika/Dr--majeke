@@ -211,7 +211,6 @@ function AppContent() {
         id="home"
         className="relative bg-cover bg-center bg-no-repeat py-10 md:py-24 px-4 sm:px-6 lg:px-8 flex items-start md:items-center home-hero-bg"
       >
-        <div className="absolute inset-0 bg-white/25"></div>
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="text-center">
             <div className="mb-3 md:mb-8">

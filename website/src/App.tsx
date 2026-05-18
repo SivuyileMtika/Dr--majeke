@@ -5,6 +5,7 @@ import { AuthModal } from './components/AuthModal';
 import './App.css';
 import Header from './components/Header';
 import homeBg from './assets/home-bg.jpg';
+import logoUrl from './assets/logo.png';
 
 interface TimeSlot {
   time: string;
@@ -753,7 +754,7 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-8 border-b border-gray-800">
           <div className="flex flex-col items-start gap-3">
             <div className="flex items-center gap-3">
-              <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo" className="h-12 w-12 object-contain" />
+              <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain" />
               <div>
                 <h5 className="font-bold text-white">Dr. S Mtika</h5>
                 <p className="text-orange-400 text-xs">General Practitioner</p>

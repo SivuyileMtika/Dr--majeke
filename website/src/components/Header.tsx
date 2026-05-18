@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
+import logoUrl from '../assets/logo.png';
 
 interface HeaderProps {
   isAuthenticated?: boolean;
@@ -21,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
         <div className="flex items-center gap-3 pl-2 flex-shrink-0">
           <a href="#home" className="flex items-center gap-3" onClick={closeMenu}>
             <img
-              src={`${import.meta.env.BASE_URL}logo.png`}
+              src={logoUrl}
               alt="Dr. S Mtika Logo"
               className="h-8 w-8 md:h-10 md:w-10 rounded-full object-cover flex-shrink-0"
             />

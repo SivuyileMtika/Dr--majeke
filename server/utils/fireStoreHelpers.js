@@ -52,6 +52,46 @@ async function getAvailableSlots(db, date) {
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
+// Returns next ≤7 weekday dates that still have at least one available slot
+async function getAvailableDates(db) {
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const snap = await db.collection('time_slots')
+    .where('status', '==', 'available')
+    .get();
+
+  const dateSet = new Set();
+  snap.docs.forEach(doc => {
+    const { date } = doc.data();
+    if (date > todayStr) dateSet.add(date);
+  });
+
+  return [...dateSet]
+    .sort()
+    .filter(d => {
+      const day = new Date(d + 'T00:00:00').getDay();
+      return day !== 0 && day !== 6; // weekdays only
+    })
+    .slice(0, 7);
+}
+
+// Returns { 'YYYY-MM-DD': ['HH:MM', ...] } for all confirmed/pending appointments
+async function getBookedSlots(db) {
+  const snap = await db.collection('appointments')
+    .where('status', 'in', ['confirmed', 'pending_approval'])
+    .get();
+
+  const result = {};
+  snap.docs.forEach(doc => {
+    const { date, time } = doc.data();
+    if (date && time) {
+      if (!result[date]) result[date] = [];
+      if (!result[date].includes(time)) result[date].push(time);
+    }
+  });
+  return result;
+}
+
 async function markSlotPending(db, slotId, phone) {
   await db.collection('time_slots').doc(slotId).update({
     status:          'pending',
@@ -88,6 +128,8 @@ module.exports = {
   updateConversationState,
   createAppointment,
   getAvailableSlots,
+  getAvailableDates,
+  getBookedSlots,
   markSlotPending,
   markSlotConfirmed,
   getServices,

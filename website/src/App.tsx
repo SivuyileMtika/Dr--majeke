@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, Clock, User, Phone, Mail, MapPin, Heart, Shield, Stethoscope, CheckCircle, Users, Award, Clock3 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
@@ -45,12 +45,23 @@ function AppContent() {
     membershipNumber: '',
   });
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [serverBookedSlots, setServerBookedSlots] = useState<Record<string, string[]>>({});
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [submittedBooking, setSubmittedBooking] = useState<{ date: string; time: string } | null>(null);
 
   const timeRef    = useRef<HTMLDivElement>(null);
   const formRef    = useRef<HTMLDivElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'https://dr-majeke-production.up.railway.app';
+
+  useEffect(() => {
+    if (!showBookingSection) return;
+    fetch(`${API_BASE}/booked-slots`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setServerBookedSlots(data.data); })
+      .catch(() => {});
+  }, [showBookingSection]);
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     setTimeout(() => {
@@ -88,7 +99,9 @@ function AppContent() {
     return dates;
   };
 
-  const isSlotBooked = (date: string, time: string) => bookedSlots.includes(`${date}-${time}`);
+  const isSlotBooked = (date: string, time: string) =>
+    (serverBookedSlots[date]?.includes(time) ?? false) ||
+    bookedSlots.includes(`${date}-${time}`);
 
   const getAvailableSlotsForDate = (date: string) =>
     timeSlots.filter(slot => !isSlotBooked(date, slot.time)).length;
@@ -124,7 +137,6 @@ function AppContent() {
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'https://dr-majeke-production.up.railway.app';
       const res = await fetch(`${API_BASE}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,6 +161,11 @@ function AppContent() {
     }
 
     setBookedSlots([...bookedSlots, `${bookingData.date}-${bookingData.time}`]);
+    // Refresh server slots so the calendar reflects the new booking immediately
+    fetch(`${API_BASE}/booked-slots`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setServerBookedSlots(data.data); })
+      .catch(() => {});
     setSubmittedBooking({ date: bookingData.date, time: bookingData.time });
     setShowBookingForm(false);
     setSelectedDate('');

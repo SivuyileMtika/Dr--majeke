@@ -1,5 +1,5 @@
 const { sendWhatsAppMessage, sendWhatsAppButtons } = require('../utils/whatsappButtons');
-const { getServices, getMedicalAids, getNextSevenDays, getAvailableSlots } = require('../utils/fireStoreHelpers');
+const { getServices, getMedicalAids, getAvailableDates, getAvailableSlots } = require('../utils/fireStoreHelpers');
 
 // "2026-05-19" → "Mon, 19 May"
 function fmtDateLabel(dateStr) {
@@ -11,7 +11,7 @@ function fmtDateLabel(dateStr) {
 async function handleInitialMessage(db, phone, text) {
   const t = text.toLowerCase().trim();
   if (t === 'hi' || t === 'hello' || t === 'start') {
-    await sendWhatsAppButtons(phone, 'Welcome to Dr. Majeke Clinic! What would you like to do?', [
+    await sendWhatsAppButtons(phone, 'Welcome to Dr. S Mtika Clinic! What would you like to do?', [
       'Book Appointment',
       'View Price List',
     ]);
@@ -23,7 +23,11 @@ async function handleInitialMessage(db, phone, text) {
 async function handleMenuSelection(db, phone, selection) {
   const s = selection.trim();
   if (s === '1' || s.toLowerCase().includes('book')) {
-    const dates = await getNextSevenDays();
+    const dates = await getAvailableDates(db);
+    if (dates.length === 0) {
+      await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
+      return 'menu';
+    }
     await sendWhatsAppButtons(phone, 'Select an appointment date:', dates.map(fmtDateLabel));
     return 'selecting_date';
   }
@@ -42,7 +46,7 @@ async function handleMenuSelection(db, phone, selection) {
 }
 
 async function handleDateSelection(db, phone, selectedDate, conversationData) {
-  const dates = await getNextSevenDays();
+  const dates = await getAvailableDates(db);
   const s     = selectedDate.trim();
 
   let dateIndex = -1;
@@ -54,6 +58,10 @@ async function handleDateSelection(db, phone, selectedDate, conversationData) {
   }
 
   if (dateIndex === -1) {
+    if (dates.length === 0) {
+      await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
+      return 'menu';
+    }
     await sendWhatsAppButtons(phone, 'Please select a date from the list:', dates.map(fmtDateLabel));
     return 'selecting_date';
   }

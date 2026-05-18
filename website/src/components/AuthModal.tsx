@@ -285,15 +285,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
             </p>
           </div>
 
-          {mode === 'login' && (
-            <div className="mt-6 p-4 bg-orange-50 rounded-2xl border border-orange-200">
-              <p className="text-sm text-orange-800 font-semibold mb-2">Admin Credentials:</p>
-              <p className="text-sm text-orange-700">
-                <strong>Admin:</strong> admin@gmail.com / Admin@2025!
-              </p>
-            </div>
-          )}
-
         </div>
       </div>
     </div>

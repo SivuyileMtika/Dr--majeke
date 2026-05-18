@@ -9,17 +9,7 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: '1',
-    name: 'Admin',
-    email: 'admin@gmail.com',
-    phone: '',
-    role: 'admin',
-    password: 'Admin@2025!',
-    createdAt: new Date().toISOString()
-  }
-];
+const mockUsers: (User & { password: string })[] = [];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({

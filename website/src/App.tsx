@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Calendar, Clock, User, Phone, Mail, MapPin, Heart, Shield, Stethoscope, CheckCircle, Users, Award, Clock3 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
-import { AdminPanel } from './components/AdminPanel';
 import './App.css';
 import Header from './components/Header';
 import homeBg from './assets/home-bg.jpg';
@@ -33,7 +32,6 @@ function AppContent() {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [bookingData, setBookingData] = useState<BookingData>({
     date: '',
     time: '',
@@ -165,10 +163,6 @@ function AppContent() {
     return date.toLocaleDateString('en-ZA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  if (showAdminPanel && user?.role === 'admin') {
-    return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
-  }
-
   return (
     <div className="pt-12 min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
       <Header
@@ -177,7 +171,6 @@ function AppContent() {
         onSignIn={() => { setAuthModalMode('login'); setShowAuthModal(true); }}
         onSignUp={() => { setAuthModalMode('register'); setShowAuthModal(true); }}
         onLogout={logout}
-        onAdminToggle={() => setShowAdminPanel(!showAdminPanel)}
       />
 
       <style>{`.home-hero-bg { background-image: url(${homeBg}); }`}</style>

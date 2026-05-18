@@ -683,14 +683,6 @@ function AppContent() {
               <p className="text-orange-500 text-xs mt-1 font-medium">Open in Maps</p>
             </a>
           </div>
-
-          <iframe
-            title="Dr. Majeke Clinic location"
-            src="https://maps.google.com/maps?q=F254+Ngcwabe+St,+Mt+Frere,+Eastern+Cape,+South+Africa&output=embed&z=15"
-            className="w-full h-64 md:h-96 rounded-2xl border border-gray-200 shadow"
-            loading="lazy"
-            allowFullScreen
-          />
         </div>
       </section>
 

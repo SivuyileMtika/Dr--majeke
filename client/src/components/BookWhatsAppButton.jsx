@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function BookWhatsAppButton({ clinicPhone }) {
-  const presetMessage = encodeURIComponent("Hello, I'd like to book an appointment. I'm elderly and need assistance with booking.\nName:\nPreferred date/time:\nAny notes:");
+  const presetMessage = encodeURIComponent("Hello, I'd like to book an appointment.\nName:\nPreferred date/time:\nAny notes:");
   const phone = clinicPhone || '1234567890';
   const href = `https://wa.me/${phone}?text=${presetMessage}`;
 

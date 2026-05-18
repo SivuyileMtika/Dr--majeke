@@ -13,11 +13,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const mockUsers: (User & { password: string })[] = [
   {
     id: '1',
-    name: 'Dr. SG Majeke',
-    email: 'admin@majeke.co.za',
-    phone: '(011) 123-4567',
+    name: 'Admin',
+    email: 'admin@gmail.com',
+    phone: '',
     role: 'admin',
-    password: 'admin123',
+    password: 'Admin@2025!',
     createdAt: new Date().toISOString()
   }
 ];

@@ -642,40 +642,62 @@ function AppContent() {
         </div>
       </section>
 
-      <section id="contact" className="py-24 bg-white">
+      <section id="contact" className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-6">Get In Touch</h3>
-            <p className="text-lg md:text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">Get In Touch</h3>
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
               Contact Dr. SG Majeke's practice for any questions or emergency consultations
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
+
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            <a
+              href="tel:0892550069"
+              className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 hover:shadow-md transition-shadow"
+            >
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 shadow">
                 <Phone className="h-5 w-5 text-white" />
               </div>
-              <h4 className="text-xs font-bold text-gray-900 mb-1">Phone</h4>
+              <h4 className="text-xs font-bold text-gray-900 mb-1">Call Us</h4>
               <p className="text-gray-700 text-xs font-semibold">089 255 0069</p>
-              <p className="text-gray-500 text-xs mt-1">8am–5pm</p>
-            </div>
-            <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200">
+              <p className="text-orange-500 text-xs mt-1 font-medium">Tap to call</p>
+            </a>
+
+            <a
+              href="mailto:dr@email.com"
+              className="text-center p-3 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 hover:shadow-md transition-shadow"
+            >
               <div className="bg-gradient-to-r from-gray-700 to-gray-800 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 shadow">
                 <Mail className="h-5 w-5 text-white" />
               </div>
-              <h4 className="text-xs font-bold text-gray-900 mb-1">Email</h4>
+              <h4 className="text-xs font-bold text-gray-900 mb-1">Email Us</h4>
               <p className="text-gray-700 text-xs font-semibold">dr@email.com</p>
-              <p className="text-gray-500 text-xs mt-1">24hr reply</p>
-            </div>
-            <div className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
+              <p className="text-gray-500 text-xs mt-1 font-medium">Tap to email</p>
+            </a>
+
+            <a
+              href="https://maps.google.com/?q=F254+Ngcwabe+St,+Mt+Frere,+Eastern+Cape,+South+Africa"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-center p-3 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 hover:shadow-md transition-shadow"
+            >
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 shadow">
                 <MapPin className="h-5 w-5 text-white" />
               </div>
-              <h4 className="text-xs font-bold text-gray-900 mb-1">Address</h4>
+              <h4 className="text-xs font-bold text-gray-900 mb-1">Find Us</h4>
               <p className="text-gray-700 text-xs font-semibold">F254 Ngcwabe St</p>
-              <p className="text-gray-500 text-xs mt-1">Mt Frere, 5090</p>
-            </div>
+              <p className="text-orange-500 text-xs mt-1 font-medium">Open in Maps</p>
+            </a>
           </div>
+
+          <iframe
+            title="Dr. Majeke Clinic location"
+            src="https://maps.google.com/maps?q=F254+Ngcwabe+St,+Mt+Frere,+Eastern+Cape,+South+Africa&output=embed&z=15"
+            className="w-full h-64 md:h-96 rounded-2xl border border-gray-200 shadow"
+            loading="lazy"
+            allowFullScreen
+          />
         </div>
       </section>
 

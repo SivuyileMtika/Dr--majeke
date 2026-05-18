@@ -22,12 +22,12 @@ const Header: React.FC<HeaderProps> = ({ isAuthenticated, user, onSignIn, onSign
           <a href="#home" className="flex items-center gap-3" onClick={closeMenu}>
             <img
               src={`${import.meta.env.BASE_URL}logo.png`}
-              alt="Dr. SG Majeke Logo"
+              alt="Dr. S Mtika Logo"
               className="h-8 w-8 md:h-10 md:w-10 rounded-full object-cover flex-shrink-0"
             />
             <div className="leading-none overflow-hidden">
               <div className="text-sm font-bold text-orange-700 truncate max-w-[8rem] sm:max-w-xs">
-                Dr. SG Majeke
+                Dr. S Mtika
               </div>
               <div className="text-xs text-black truncate max-w-[8rem] sm:max-w-xs text-[10px]">
                 General Practitioner

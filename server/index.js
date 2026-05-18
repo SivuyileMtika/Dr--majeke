@@ -1,14 +1,3 @@
-/*
-.env vars required:
-PORT=3000
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token
-TWILIO_WHATSAPP_NUMBER=+14155238886   (sandbox) or your approved number
-FIREBASE_SERVICE_ACCOUNT={...}        (JSON string or path to file)
-DOCTOR_AUTH_TOKEN=secure-token-here
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
-*/
-
 const express    = require('express');
 const cors       = require('cors');
 const dotenv     = require('dotenv');
@@ -35,7 +24,7 @@ const {
 const { seedMedicalAids, seedServices, seedTimeSlots } = require('./utils/seeding');
 const { authMiddleware }           = require('./middleware/auth');
 const { confirmAppointmentHandler } = require('./controllers/appointmentController');
-const { sendWhatsAppMessage }      = require('./utils/sendWhatsAppMessage');
+const { sendWhatsAppMessage }      = require('./utils/whatsappButtons');
 
 dotenv.config();
 
@@ -72,7 +61,6 @@ app.use(bodyParser.json());
 
 const PORT = process.env.PORT || 3000;
 
-// ── Twilio WhatsApp webhook ──────────────────────────────────────────────────
 app.post('/webhook', async (req, res) => {
   // Validate the request came from Twilio
   const twilioSignature = req.headers['x-twilio-signature'];
@@ -159,7 +147,6 @@ app.post('/webhook', async (req, res) => {
   res.send('<Response></Response>');
 });
 
-// ── REST endpoints ────────────────────────────────────────────────────────────
 app.post('/confirm-appointment', authMiddleware, (req, res) => confirmAppointmentHandler(db, req, res));
 
 app.get('/services', async (req, res) => {

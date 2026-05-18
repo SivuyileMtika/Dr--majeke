@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth';
+import { auth } from '../firebase';
 import { User, AuthState, LoginCredentials, RegisterData } from '../types/auth';
 
 interface AuthContextType extends AuthState {
@@ -9,54 +17,39 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const mockUsers: (User & { password: string })[] = [];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
-    isLoading: true
+    isLoading: true,
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setAuthState({
-          user,
-          isAuthenticated: true,
-          isLoading: false
-        });
-      } catch (error) {
-        localStorage.removeItem('user');
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const phone = localStorage.getItem(`phone_${firebaseUser.uid}`) || '';
+        const user: User = {
+          id:        firebaseUser.uid,
+          name:      firebaseUser.displayName || '',
+          email:     firebaseUser.email || '',
+          phone,
+          role:      'user',
+          createdAt: firebaseUser.metadata.creationTime || new Date().toISOString(),
+        };
+        setAuthState({ user, isAuthenticated: true, isLoading: false });
+      } else {
+        setAuthState({ user: null, isAuthenticated: false, isLoading: false });
       }
-    } else {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
+    });
+    return unsubscribe;
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const user = mockUsers.find(
-      u => u.email === credentials.email && u.password === credentials.password
-    );
-    
-    if (user) {
-      const { password, ...userWithoutPassword } = user;
-      setAuthState({
-        user: userWithoutPassword,
-        isAuthenticated: true,
-        isLoading: false
-      });
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+    try {
+      await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
       return true;
-    } else {
+    } catch {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return false;
     }
@@ -64,54 +57,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const existingUser = mockUsers.find(u => u.email === data.email);
-    if (existingUser) {
+    try {
+      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      await updateProfile(firebaseUser, { displayName: data.name });
+      localStorage.setItem(`phone_${firebaseUser.uid}`, data.phone);
+      return true;
+    } catch {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return false;
     }
-
-    const newUser = {
-      id: Date.now().toString(),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      role: 'user' as const,
-      password: data.password,
-      createdAt: new Date().toISOString()
-    };
-    
-    mockUsers.push(newUser);
-    
-    const { password, ...userWithoutPassword } = newUser;
-    setAuthState({
-      user: userWithoutPassword,
-      isAuthenticated: true,
-      isLoading: false
-    });
-    localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-    return true;
   };
 
   const logout = () => {
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false
-    });
-    localStorage.removeItem('user');
+    signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{
-      ...authState,
-      login,
-      register,
-      logout
-    }}>
+    <AuthContext.Provider value={{ ...authState, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

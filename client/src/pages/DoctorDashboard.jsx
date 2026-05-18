@@ -6,7 +6,6 @@ import axios from 'axios';
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 const AUTH_TOKEN = process.env.REACT_APP_DOCTOR_TOKEN || '';
 
-// ─── tiny helpers ────────────────────────────────────────────────────────────
 const fmtDate = s => {
   try { return new Date(s + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }); }
   catch { return s; }
@@ -78,7 +77,6 @@ const ActionBtn = ({ variant, disabled, onClick, children }) => {
   );
 };
 
-// ─── main component ──────────────────────────────────────────────────────────
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -157,7 +155,6 @@ export default function DoctorDashboard() {
 
   const toggleSort = f => { if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(f); setSortDir('asc'); } };
 
-  // calendar
   const buildCal = () => {
     const yr = month.getFullYear(), mo = month.getMonth();
     const first = new Date(yr, mo, 1).getDay(), days = new Date(yr, mo + 1, 0).getDate();
@@ -177,7 +174,6 @@ export default function DoctorDashboard() {
   const weeks    = buildCal();
   const monthStr = month.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
 
-  // ─── CSS ─────────────────────────────────────────────────────────────────
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -199,7 +195,6 @@ export default function DoctorDashboard() {
     ::-webkit-scrollbar { width: 4px; height: 4px; } ::-webkit-scrollbar-thumb { background: ${PALETTE.slate200}; border-radius: 4px; }
   `;
 
-  // ─── loading / error ─────────────────────────────────────────────────────
   if (loading) return (
     <>
       <style>{css}</style>
@@ -219,7 +214,6 @@ export default function DoctorDashboard() {
       <style>{css}</style>
       <div style={{ minHeight: '100vh', background: PALETTE.slate50 }}>
 
-        {/* ── Header ── */}
         <header style={{ background: '#fff', borderBottom: `1px solid ${PALETTE.slate200}`, padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 50 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: PALETTE.orange, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -250,7 +244,6 @@ export default function DoctorDashboard() {
 
         <div style={{ padding: '28px 32px', maxWidth: 1320, margin: '0 auto' }}>
 
-          {/* ── Stat row ── */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 28 }}>
             {[
               { label: 'Total',     value: stats.total,     accent: PALETTE.blue },
@@ -266,7 +259,6 @@ export default function DoctorDashboard() {
             ))}
           </div>
 
-          {/* ── Tab bar ── */}
           <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${PALETTE.slate200}`, marginBottom: 24 }}>
             {[
               { key: 'overview', label: 'Overview' },
@@ -280,11 +272,9 @@ export default function DoctorDashboard() {
             ))}
           </div>
 
-          {/* ══ OVERVIEW ══════════════════════════════════════════════════════ */}
           {tab === 'overview' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
-              {/* Today */}
               <Card style={{ padding: 24 }}>
                 <SectionTitle>Today — {now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}</SectionTitle>
                 {forDay(today).length === 0
@@ -307,7 +297,6 @@ export default function DoctorDashboard() {
                   ))}
               </Card>
 
-              {/* Needs approval */}
               <Card style={{ padding: 24 }}>
                 <SectionTitle>Needs Approval</SectionTitle>
                 {pending.length === 0
@@ -337,7 +326,6 @@ export default function DoctorDashboard() {
                 )}
               </Card>
 
-              {/* Recent bookings */}
               <Card style={{ padding: 24, gridColumn: '1 / -1' }}>
                 <SectionTitle>Recent Bookings</SectionTitle>
                 {appointments.slice(0, 6).map((apt, i) => (
@@ -363,25 +351,21 @@ export default function DoctorDashboard() {
             </div>
           )}
 
-          {/* ══ CALENDAR ══════════════════════════════════════════════════════ */}
           {tab === 'calendar' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
               <Card style={{ padding: 24 }}>
-                {/* nav */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                   <button onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))} style={{ background: 'none', border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: PALETTE.slate700 }}>Prev</button>
                   <span style={{ fontWeight: 700, fontSize: 16, color: PALETTE.slate900 }}>{monthStr}</span>
                   <button onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))} style={{ background: 'none', border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13, color: PALETTE.slate700 }}>Next</button>
                 </div>
 
-                {/* day headers */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, marginBottom: 4 }}>
                   {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
                     <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: PALETTE.slate500, padding: '4px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>
                   ))}
                 </div>
 
-                {/* grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
                   {weeks.flatMap((wk, wi) => wk.map((cell, di) => {
                     if (!cell) return <div key={`e-${wi}-${di}`} />;
@@ -406,7 +390,6 @@ export default function DoctorDashboard() {
                   }))}
                 </div>
 
-                {/* legend */}
                 <div style={{ display: 'flex', gap: 16, marginTop: 16, fontSize: 11, color: PALETTE.slate500 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: PALETTE.amberLight, color: PALETTE.amber, borderRadius: 3, padding: '0 4px', fontWeight: 700, fontSize: 9 }}>P</span> Pending</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ background: PALETTE.greenLight, color: PALETTE.green, borderRadius: 3, padding: '0 4px', fontWeight: 700, fontSize: 9 }}>C</span> Confirmed</span>
@@ -414,7 +397,6 @@ export default function DoctorDashboard() {
                 </div>
               </Card>
 
-              {/* day detail */}
               <Card style={{ padding: 24 }}>
                 <SectionTitle>{selectedDay ? fmtDateLong(selectedDay) : 'Select a day'}</SectionTitle>
                 <div style={{ maxHeight: 520, overflowY: 'auto' }}>
@@ -453,12 +435,9 @@ export default function DoctorDashboard() {
             </div>
           )}
 
-          {/* ══ TABLE ══════════════════════════════════════════════════════════ */}
           {tab === 'table' && (
             <Card>
-              {/* toolbar */}
               <div style={{ padding: '16px 20px', borderBottom: `1px solid ${PALETTE.slate100}` }}>
-                {/* row 1: search + clear */}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
                   <input type="search" placeholder="Search name or phone…" value={search} onChange={e => setSearch(e.target.value)}
                     style={{ flex: 1, border: `1px solid ${PALETTE.slate200}`, borderRadius: 6, padding: '7px 12px', fontSize: 13, color: PALETTE.slate700 }} />
@@ -468,9 +447,7 @@ export default function DoctorDashboard() {
                     </button>
                   )}
                 </div>
-                {/* row 2: filter groups */}
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                  {/* Status */}
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Status</div>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -479,7 +456,6 @@ export default function DoctorDashboard() {
                       ))}
                     </div>
                   </div>
-                  {/* Source */}
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Source</div>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -488,7 +464,6 @@ export default function DoctorDashboard() {
                       ))}
                     </div>
                   </div>
-                  {/* Payment */}
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Payment</div>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -497,7 +472,6 @@ export default function DoctorDashboard() {
                       ))}
                     </div>
                   </div>
-                  {/* Date range */}
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: PALETTE.slate500, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 5 }}>Date Range</div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -573,7 +547,6 @@ export default function DoctorDashboard() {
             </Card>
           )}
 
-          {/* ══ PENDING ════════════════════════════════════════════════════════ */}
           {tab === 'pending' && (
             <>
               {pending.length === 0 && (

@@ -217,7 +217,7 @@ function AppContent() {
             <div className="mb-3 md:mb-8">
               <div className="inline-flex items-center bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-semibold text-xs md:text-lg mb-3 md:mb-6">
                 <Heart className="h-3 w-3 mr-1 md:h-5 md:w-5 md:mr-2" />
-                Caring for Our Community Since 20...
+                Caring for Our Community
               </div>
             </div>
             <h2 className="text-xl md:text-4xl font-bold text-gray-950 drop-shadow mb-3 md:mb-8">

@@ -65,7 +65,6 @@ app.use(bodyParser.json());
 const PORT = process.env.PORT || 3000;
 
 app.post('/webhook', async (req, res) => {
-  // Validate the request came from Twilio
   const twilioSignature = req.headers['x-twilio-signature'];
   const webhookUrl = process.env.WEBHOOK_URL || `${req.protocol}://${req.get('host')}/webhook`;
   const isValid = twilio.validateRequest(
@@ -78,16 +77,10 @@ app.post('/webhook', async (req, res) => {
     return res.status(403).send('Forbidden');
   }
 
-  // Twilio body: From = "whatsapp:+2712345678", Body = message text
-  const rawFrom = req.body.From || '';
-  const phone   = rawFrom.replace('whatsapp:', '');
-  const text    = (req.body.Body || '').trim();
+  const phone = (req.body.From || '').replace('whatsapp:', '');
+  const text  = (req.body.Body || '').trim();
 
-  if (!phone) {
-    return res.status(400).send('Missing From');
-  }
-
-  console.log(`Message from ${phone}: ${text}`);
+  if (!phone) return res.status(400).send('Missing From');
 
   try {
     const conversation  = await getOrCreateConversation(db, phone);
@@ -145,7 +138,6 @@ app.post('/webhook', async (req, res) => {
     console.error('Webhook processing error:', err);
   }
 
-  // Twilio expects a 200 with empty TwiML or just 200
   res.set('Content-Type', 'text/xml');
   res.send('<Response></Response>');
 });
@@ -189,7 +181,6 @@ app.post('/book', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields: patient_name, phone, date, time' });
     }
 
-    // Reject if this slot is already confirmed — first-come, first-served
     const conflict = await db.collection('appointments')
       .where('date', '==', date)
       .where('time', '==', time)

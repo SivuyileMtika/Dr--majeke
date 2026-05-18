@@ -114,12 +114,10 @@ export default function DoctorDashboard() {
     return () => clearInterval(t);
   }, []);
 
-  // Persist auto-pilot preference
   useEffect(() => {
     localStorage.setItem('autopilot', autoPilot);
   }, [autoPilot]);
 
-  // Auto-pilot: approve first-come, reject duplicates
   useEffect(() => {
     if (!autoPilot || appointments.length === 0) return;
     const pending = appointments.filter(a => a.status === 'pending_approval');

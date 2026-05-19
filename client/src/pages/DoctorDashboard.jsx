@@ -309,9 +309,7 @@ export default function DoctorDashboard() {
 
         <header className="dash-header">
           <div className="dash-header-left">
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: P.orange, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            </div>
+            <img src="/logo.png" alt="Dr. S Mtika" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: P.slate900, lineHeight: 1.2 }}>Dr. S Mtika</div>
               <div style={{ fontSize: 11, color: P.slate500 }}>Booking Management</div>

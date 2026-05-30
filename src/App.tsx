@@ -373,7 +373,7 @@ function AppContent() {
         className="relative bg-cover bg-center bg-no-repeat py-24 px-4 sm:px-6 lg:px-8 min-h-[300px] max-h-[500px] flex items-center home-hero-bg"
       >
         {/* Overlay for readability */}
-        <div className="absolute inset-0 bg-white/80"></div>
+        <div className="absolute inset-0 bg-white/50"></div>
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           <div className="text-center">
             <div className="mb-8">

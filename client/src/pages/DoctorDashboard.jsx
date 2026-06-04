@@ -50,8 +50,10 @@ const Avatar = ({ name, size = 34 }) => {
   );
 };
 
-const AptCard = ({ apt, actionLoading, actionError, onApprove, onReject }) => (
-  <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '12px 14px', borderLeft: `3px solid ${apt.status === 'confirmed' ? '#16a34a' : apt.status === 'rejected' ? '#dc2626' : '#d97706'}` }}>
+const AptCard = ({ apt, actionLoading, actionError, onApprove, onReject, onOpen }) => (
+  <div
+    onClick={onOpen}
+    style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '12px 14px', borderLeft: `3px solid ${apt.status === 'confirmed' ? '#16a34a' : apt.status === 'rejected' ? '#dc2626' : '#d97706'}`, cursor: 'pointer' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
       <Avatar name={apt.patient_name} size={32} />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -67,7 +69,7 @@ const AptCard = ({ apt, actionLoading, actionError, onApprove, onReject }) => (
       <SourceBadge source={apt.source} />
     </div>
     {apt.status === 'pending_approval' && (
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }} onClick={e => e.stopPropagation()}>
         <button type="button" disabled={actionLoading} onClick={onApprove}
           style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1 }}>
           {actionLoading ? '…' : 'Approve'}
@@ -96,6 +98,7 @@ export default function DoctorDashboard() {
   const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
   const autoProcessedRef                  = useRef(new Set());
   const [sheetOpen, setSheetOpen]         = useState(false);
+  const [detailApt, setDetailApt]         = useState(null);
   const [now, setNow]                     = useState(new Date());
 
   useEffect(() => {
@@ -420,7 +423,8 @@ export default function DoctorDashboard() {
                           actionLoading={actionLoading[apt.id]}
                           actionError={actionError[apt.id]}
                           onApprove={() => handleAction(apt.id, true)}
-                          onReject={() => handleAction(apt.id, false)} />
+                          onReject={() => handleAction(apt.id, false)}
+                          onOpen={() => setDetailApt(apt)} />
                       ))}
                     </div>
                   </div>
@@ -472,7 +476,7 @@ export default function DoctorDashboard() {
                           <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>No appointments found</td></tr>
                         )}
                         {filtered.map(apt => (
-                          <tr key={apt.id}>
+                          <tr key={apt.id} style={{ cursor: 'pointer' }} onClick={() => setDetailApt(apt)}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Avatar name={apt.patient_name} size={28} />
@@ -491,7 +495,7 @@ export default function DoctorDashboard() {
                             </td>
                             <td><SourceBadge source={apt.source} /></td>
                             <td><StatusBadge status={apt.status} /></td>
-                            <td>
+                            <td onClick={e => e.stopPropagation()}>
                               {apt.status === 'pending_approval' && (
                                 <div style={{ display: 'flex', gap: 6 }}>
                                   <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
@@ -644,6 +648,101 @@ export default function DoctorDashboard() {
             }
           </div>
         </div>
+
+        {/* ── Patient detail sheet ── */}
+        {detailApt && (
+          <>
+            <div className="sheet-overlay open" onClick={() => setDetailApt(null)} />
+            <div className="sheet open" style={{ maxHeight: '85vh' }}>
+              <div className="sheet-handle" />
+              <div className="sheet-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Avatar name={detailApt.patient_name} size={40} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailApt.patient_name || 'Unknown'}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{detailApt.phone}</div>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setDetailApt(null)}
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, color: '#64748b', flexShrink: 0 }}>✕</button>
+              </div>
+              <div className="sheet-body">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  {[
+                    ['Date',    fmtDateLong(detailApt.date)],
+                    ['Time',    detailApt.time],
+                    ['Status',  null],
+                    ['Source',  null],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>{label}</div>
+                      {label === 'Status'  && <StatusBadge status={detailApt.status} />}
+                      {label === 'Source'  && <SourceBadge source={detailApt.source} />}
+                      {value && <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{value}</div>}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px', marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Payment</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                    {detailApt.payment_method === 'medical_aid' ? 'Medical Aid' : 'Cash'}
+                  </div>
+                  {detailApt.payment_method === 'medical_aid' && (
+                    <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Provider</div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{detailApt.medical_aid || '—'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Plan</div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{detailApt.medical_plan || '—'}</div>
+                      </div>
+                      <div style={{ gridColumn: '1/-1' }}>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Membership No.</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{detailApt.membership_number || '—'}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {detailApt.email && (
+                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Email</div>
+                    <div style={{ fontSize: 13, color: '#0f172a' }}>{detailApt.email}</div>
+                  </div>
+                )}
+
+                {detailApt.reason && (
+                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Reason for Visit</div>
+                    <div style={{ fontSize: 13, color: '#0f172a', lineHeight: 1.5 }}>{detailApt.reason}</div>
+                  </div>
+                )}
+
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Booking Submitted</div>
+                  <div style={{ fontSize: 13, color: '#0f172a' }}>{fmtTs(detailApt.created_at)}</div>
+                </div>
+
+                {detailApt.status === 'pending_approval' && (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button type="button" disabled={actionLoading[detailApt.id]}
+                      onClick={() => { handleAction(detailApt.id, true); setDetailApt(null); }}
+                      style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                      Approve
+                    </button>
+                    <button type="button" disabled={actionLoading[detailApt.id]}
+                      onClick={() => { handleAction(detailApt.id, false); setDetailApt(null); }}
+                      style={{ flex: 1, background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
       </div>
     </>

@@ -65,12 +65,31 @@ export default function DoctorDashboard() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [actionLoading, setActionLoading] = useState({});
   const [actionError, setActionError]     = useState({});
+  const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
+  const autoProcessedRef                  = React.useRef(new Set());
   const [now, setNow]                     = useState(new Date());
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => { localStorage.setItem('autopilot', autoPilot); }, [autoPilot]);
+
+  useEffect(() => {
+    if (!autoPilot || appointments.length === 0) return;
+    const pending = appointments.filter(a => a.status === 'pending_approval');
+    pending.forEach((apt, idx) => {
+      if (autoProcessedRef.current.has(apt.id)) return;
+      autoProcessedRef.current.add(apt.id);
+      setTimeout(() => {
+        const conflict = appointments.some(
+          a => a.id !== apt.id && a.date === apt.date && a.time === apt.time && a.status === 'confirmed'
+        );
+        handleAction(apt.id, !conflict);
+      }, idx * 800);
+    });
+  }, [appointments, autoPilot]);
 
   useEffect(() => {
     if (!AUTH_TOKEN) { setError('REACT_APP_DOCTOR_TOKEN not configured'); setLoading(false); return; }
@@ -223,6 +242,14 @@ export default function DoctorDashboard() {
 
     .pending-badge { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
 
+    .ap-btn { display: flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+    .ap-btn.on  { background: #16a34a; color: #fff; }
+    .ap-btn.off { background: #f1f5f9; color: #64748b; }
+    .ap-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ap-btn.on  .ap-dot { background: #fff; animation: pulse 1.4s infinite; }
+    .ap-btn.off .ap-dot { background: #94a3b8; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 1s linear infinite; }
 
@@ -284,6 +311,15 @@ export default function DoctorDashboard() {
           </nav>
 
           <div className="topbar-right">
+            <button
+              type="button"
+              className={`ap-btn ${autoPilot ? 'on' : 'off'}`}
+              onClick={() => { if (!autoPilot) autoProcessedRef.current.clear(); setAutoPilot(p => !p); }}
+              title={autoPilot ? 'Auto Pilot ON — approves first-come bookings automatically' : 'Enable Auto Pilot'}
+            >
+              <span className="ap-dot" />
+              Auto Pilot {autoPilot ? 'ON' : 'OFF'}
+            </button>
             {pending.length > 0 && (
               <span className="pending-badge">{pending.length} pending</span>
             )}

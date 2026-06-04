@@ -264,7 +264,7 @@ export default function DoctorDashboard() {
 
         <header className="topbar">
           <div className="topbar-left">
-            <img src="/logo.png" alt="logo" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <img src="/logo.png" alt="Dr. SG Majeke" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Dr. SG Majeke</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>General Practitioner · Mt Frere</div>

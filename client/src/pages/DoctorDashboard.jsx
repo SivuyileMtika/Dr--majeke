@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import axios from 'axios';
@@ -18,30 +18,26 @@ const fmtTs = ts => {
   if (!ts) return '—';
   try {
     const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
-    return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+    return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })
       + ' ' + d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
   } catch { return '—'; }
 };
 
 const statusMap = {
   pending_approval: { label: 'Pending',   bg: '#fffbeb', color: '#d97706', border: '#fcd34d' },
-  confirmed:        { label: 'Confirmed', bg: '#f0fdf4',  color: '#16a34a', border: '#86efac' },
-  rejected:         { label: 'Rejected',  bg: '#fef2f2',  color: '#dc2626', border: '#fca5a5' },
+  confirmed:        { label: 'Confirmed', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
+  rejected:         { label: 'Rejected',  bg: '#fef2f2', color: '#dc2626', border: '#fca5a5' },
 };
 
 const StatusBadge = ({ status }) => {
   const s = statusMap[status] || { label: status, bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0' };
-  return (
-    <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {s.label}
-    </span>
-  );
+  return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>;
 };
 
 const SourceBadge = ({ source }) => (
   source === 'website'
-    ? <span style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>Website</span>
-    : <span style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>WhatsApp</span>
+    ? <span style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>Web</span>
+    : <span style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>WA</span>
 );
 
 const Avatar = ({ name, size = 34 }) => {
@@ -53,6 +49,38 @@ const Avatar = ({ name, size = 34 }) => {
     </div>
   );
 };
+
+const AptCard = ({ apt, actionLoading, actionError, onApprove, onReject }) => (
+  <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '12px 14px', borderLeft: `3px solid ${apt.status === 'confirmed' ? '#16a34a' : apt.status === 'rejected' ? '#dc2626' : '#d97706'}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <Avatar name={apt.patient_name} size={32} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
+        <div style={{ fontSize: 11, color: '#94a3b8' }}>{apt.phone}</div>
+      </div>
+      <StatusBadge status={apt.status} />
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12, color: '#475569' }}>{fmtDate(apt.date)}</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>{apt.time}</span>
+      <span style={{ fontSize: 11, color: '#64748b' }}>{apt.payment_method === 'medical_aid' ? apt.medical_aid || 'Medical Aid' : 'Cash'}</span>
+      <SourceBadge source={apt.source} />
+    </div>
+    {apt.status === 'pending_approval' && (
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <button type="button" disabled={actionLoading} onClick={onApprove}
+          style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1 }}>
+          {actionLoading ? '…' : 'Approve'}
+        </button>
+        <button type="button" disabled={actionLoading} onClick={onReject}
+          style={{ flex: 1, background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1 }}>
+          {actionLoading ? '…' : 'Reject'}
+        </button>
+      </div>
+    )}
+    {actionError && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 6 }}>{actionError}</p>}
+  </div>
+);
 
 export default function DoctorDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -66,8 +94,8 @@ export default function DoctorDashboard() {
   const [actionLoading, setActionLoading] = useState({});
   const [actionError, setActionError]     = useState({});
   const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
-  const autoProcessedRef                  = React.useRef(new Set());
-  const [showDayPanel, setShowDayPanel]   = useState(false);
+  const autoProcessedRef                  = useRef(new Set());
+  const [sheetOpen, setSheetOpen]         = useState(false);
   const [now, setNow]                     = useState(new Date());
 
   useEffect(() => {
@@ -79,14 +107,12 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     if (!autoPilot || appointments.length === 0) return;
-    const pending = appointments.filter(a => a.status === 'pending_approval');
-    pending.forEach((apt, idx) => {
+    const pend = appointments.filter(a => a.status === 'pending_approval');
+    pend.forEach((apt, idx) => {
       if (autoProcessedRef.current.has(apt.id)) return;
       autoProcessedRef.current.add(apt.id);
       setTimeout(() => {
-        const conflict = appointments.some(
-          a => a.id !== apt.id && a.date === apt.date && a.time === apt.time && a.status === 'confirmed'
-        );
+        const conflict = appointments.some(a => a.id !== apt.id && a.date === apt.date && a.time === apt.time && a.status === 'confirmed');
         handleAction(apt.id, !conflict);
       }, idx * 800);
     });
@@ -142,148 +168,132 @@ export default function DoctorDashboard() {
     return weeks;
   };
 
+  const weeks    = buildCal();
+  const monthStr = month.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
+  const dayApts  = forDay(selectedDay);
+
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; -webkit-text-size-adjust: 100%; }
+    html, body { height: 100%; -webkit-text-size-adjust: 100%; }
+    body { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
 
-    .dash { display: flex; flex-direction: column; min-height: 100vh; }
+    .dash { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-    /* ── Topbar ── */
+    /* Topbar */
     .topbar {
       background: #fff; border-bottom: 1px solid #e2e8f0;
-      padding: 0 24px; min-height: 56px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 40; gap: 8px; flex-wrap: wrap;
+      padding: 0 24px; height: 56px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
     }
-    .topbar-left  { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-    .topbar-center { display: flex; flex: 1; justify-content: center; }
-    .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
-    /* ── Nav ── */
-    .nav { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-    .nav::-webkit-scrollbar { display: none; }
-    .nav-btn {
-      background: none; border: none;
-      padding: 6px 12px; border-radius: 6px;
-      font-size: 13px; font-weight: 500;
-      color: #64748b; cursor: pointer;
-      transition: background .15s, color .15s;
-      white-space: nowrap; flex-shrink: 0;
-    }
+    /* Desktop nav */
+    .desktop-nav { display: flex; gap: 2px; }
+    .nav-btn { background: none; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; transition: background .15s, color .15s; white-space: nowrap; }
     .nav-btn:hover  { background: #f1f5f9; color: #0f172a; }
     .nav-btn.active { background: #fff7ed; color: #ea580c; font-weight: 600; }
 
-    /* ── Body layout ── */
-    .body { display: flex; flex: 1; min-height: 0; }
-    .main { flex: 1; overflow-y: auto; padding: 24px 24px; min-width: 0; }
-    .sidebar {
-      width: 290px; min-width: 290px; flex-shrink: 0;
-      border-left: 1px solid #e2e8f0;
-      background: #fff; overflow-y: auto; padding: 20px;
-    }
+    /* Body */
+    .body { display: flex; flex: 1; overflow: hidden; }
+    .main { flex: 1; overflow-y: auto; padding: 20px 24px; -webkit-overflow-scrolling: touch; }
+    .sidebar { width: 280px; min-width: 280px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: #fff; overflow-y: auto; padding: 20px; }
 
-    /* ── Calendar ── */
-    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
-    .cal-head { font-size: 10px; font-weight: 700; color: #94a3b8; text-align: center; padding: 6px 0; text-transform: uppercase; letter-spacing: .5px; }
-    .cal-cell {
-      border-radius: 6px; min-height: 68px; padding: 5px;
-      cursor: pointer; transition: background .12s;
-      border: 1px solid transparent; overflow: hidden;
-    }
-    .cal-cell:hover    { background: #f8fafc; border-color: #e2e8f0; }
+    /* Calendar */
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    .cal-head { font-size: 10px; font-weight: 700; color: #94a3b8; text-align: center; padding: 5px 0; text-transform: uppercase; }
+    .cal-cell { border-radius: 6px; min-height: 64px; padding: 5px; cursor: pointer; border: 1px solid transparent; transition: border-color .1s, background .1s; }
+    .cal-cell:hover    { border-color: #e2e8f0; background: #f8fafc; }
     .cal-cell.today    { background: #fff7ed; border-color: #fdba74; }
     .cal-cell.selected { background: #fff7ed; border-color: #ea580c; }
-    .cal-day { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
-    .cal-cell.today .cal-day    { color: #ea580c; font-weight: 700; }
-    .cal-cell.selected .cal-day { color: #ea580c; font-weight: 700; }
-    .dot-row { display: flex; flex-wrap: wrap; gap: 2px; }
-    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .cal-num { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
+    .cal-cell.today .cal-num    { color: #ea580c; font-weight: 700; }
+    .cal-cell.selected .cal-num { color: #ea580c; font-weight: 700; }
+    .cal-dots { display: flex; flex-wrap: wrap; gap: 2px; }
+    .dot { width: 5px; height: 5px; border-radius: 50%; }
 
-    /* ── Mobile day panel ── */
-    .day-panel-mobile {
-      display: none;
-      background: #fff; border-top: 1px solid #e2e8f0;
-      padding: 16px; margin-top: 16px;
-      border-radius: 12px; border: 1px solid #e2e8f0;
-    }
+    /* Card list */
+    .card-list { display: flex; flex-direction: column; gap: 10px; }
 
-    /* ── Appointment card in sidebar ── */
-    .apt-card {
-      border: 1px solid #e2e8f0; border-radius: 8px;
-      padding: 12px; margin-bottom: 10px; background: #fff;
-    }
-    .apt-card:last-child { margin-bottom: 0; }
-    .divider { height: 1px; background: #f1f5f9; margin: 10px 0; }
-    .action-row { display: flex; gap: 8px; margin-top: 10px; }
+    /* Pending grid */
+    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 
-    /* ── Buttons ── */
-    .btn-approve { background: #16a34a; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 8px 0; }
-    .btn-approve:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-reject  { background: #fff; color: #dc2626; border: 1px solid #dc2626; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 8px 0; }
-    .btn-reject:disabled  { opacity: .5; cursor: not-allowed; }
+    /* Filters */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .search-input { flex: 1; min-width: 140px; max-width: 260px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; font-size: 13px; color: #334155; }
+    .search-input:focus { outline: 2px solid #ea580c; outline-offset: 1px; }
+    .pill-row { display: flex; gap: 5px; flex-wrap: wrap; }
+    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; white-space: nowrap; }
+    .pill.on { background: #ea580c; border-color: #ea580c; color: #fff; font-weight: 600; }
 
-    /* ── Table ── */
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
-    th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
-    tr:hover td { background: #f8fafc; }
-    tr:last-child td { border-bottom: none; }
-
-    /* ── Filters ── */
-    .filters-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-    input[type="search"] { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; font-size: 13px; color: #334155; min-width: 0; flex: 1; max-width: 240px; }
-    input[type="search"]:focus { outline: 2px solid #ea580c; outline-offset: 1px; }
-    .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .filter-pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; white-space: nowrap; }
-    .filter-pill.active { background: #ea580c; border-color: #ea580c; color: #fff; font-weight: 600; }
-
-    /* ── Pending cards ── */
-    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-
-    /* ── Badges ── */
-    .pending-badge { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-    .ap-btn { display: flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; white-space: nowrap; }
+    /* Badges */
+    .badge-pending { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+    .ap-btn { display: flex; align-items: center; gap: 5px; border: none; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .ap-btn.on  { background: #16a34a; color: #fff; }
     .ap-btn.off { background: #f1f5f9; color: #64748b; }
-    .ap-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ap-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .ap-btn.on  .ap-dot { background: #fff; animation: pulse 1.4s infinite; }
     .ap-btn.off .ap-dot { background: #94a3b8; }
 
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-    @keyframes spin  { to { transform: rotate(360deg); } }
+    /* Desktop table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 540px; }
+    th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:hover td { background: #f8fafc; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Bottom sheet overlay */
+    .sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; }
+    .sheet-overlay.open { display: block; }
+    .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 16px 16px 0 0; z-index: 101; max-height: 75vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); }
+    .sheet.open { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+    .sheet-header { padding: 14px 18px 10px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+    .sheet-body { overflow-y: auto; padding: 14px 18px 24px; flex: 1; -webkit-overflow-scrolling: touch; }
+
+    /* Bottom nav — mobile only */
+    .bottom-nav { display: none; }
+
+    /* Spinners etc */
+    @keyframes spin   { to { transform: rotate(360deg); } }
+    @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.3} }
     .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 1s linear infinite; }
 
-    /* ── Tablet (≤ 1024px) ── */
-    @media (max-width: 1024px) {
-      .sidebar { width: 260px; min-width: 260px; }
-    }
-
-    /* ── Mobile (≤ 768px) ── */
+    /* Mobile (≤ 768px) */
     @media (max-width: 768px) {
-      .topbar { padding: 0 14px; min-height: 52px; }
-      .topbar-center { justify-content: flex-start; }
+      .topbar { padding: 0 16px; height: 52px; }
+      .desktop-nav { display: none; }
       .sidebar { display: none; }
-      .main { padding: 14px; }
-      .day-panel-mobile { display: block; }
-      .cal-cell { min-height: 52px; padding: 4px; }
-      .cal-day { font-size: 11px; }
-      .dot { width: 5px; height: 5px; }
-      .header-date { display: none; }
-      input[type="search"] { max-width: 100%; }
+      .main { padding: 12px 14px 72px; }
+      .cal-cell { min-height: 46px; padding: 4px; }
+      .cal-num { font-size: 11px; }
       .pending-grid { grid-template-columns: 1fr; }
+      .ap-label { display: none; }
+      #mobile-bookings { display: flex !important; }
+      .desktop-table { display: none; }
+
+      .bottom-nav {
+        display: flex;
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff; border-top: 1px solid #e2e8f0;
+        height: 58px; z-index: 50;
+      }
+      .bnav-btn {
+        flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px; background: none; border: none; cursor: pointer;
+        font-size: 10px; font-weight: 500; color: #94a3b8; padding: 0;
+        transition: color .15s;
+      }
+      .bnav-btn.active { color: #ea580c; }
+      .bnav-icon { font-size: 19px; line-height: 1; }
     }
 
-    /* ── Small mobile (≤ 480px) ── */
-    @media (max-width: 480px) {
-      .topbar { flex-wrap: wrap; padding: 8px 14px; height: auto; gap: 8px; }
-      .topbar-left { flex: 1; }
-      .topbar-right { gap: 6px; }
-      .nav-btn { padding: 6px 10px; font-size: 12px; }
-      .ap-btn span:last-child { display: none; }
-      .cal-cell { min-height: 44px; }
-      .cal-head { font-size: 9px; letter-spacing: 0; }
+    @media (max-width: 380px) {
+      .topbar-brand span { display: none; }
+      .cal-head { font-size: 9px; }
     }
   `;
 
@@ -299,181 +309,151 @@ export default function DoctorDashboard() {
   if (error) return (
     <>
       <style>{css}</style>
-      <div style={{ padding: 32, color: '#dc2626', fontSize: 14 }}>{error}</div>
+      <div style={{ padding: 24, color: '#dc2626', fontSize: 14 }}>{error}</div>
     </>
   );
 
-  const weeks     = buildCal();
-  const monthStr  = month.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
-  const dayApts   = forDay(selectedDay);
+  const tabConfig = [
+    { key: 'calendar', label: 'Calendar', icon: '📅' },
+    { key: 'bookings', label: 'Bookings', icon: '📋' },
+    { key: 'pending',  label: `Pending${pending.length ? ` (${pending.length})` : ''}`, icon: '⏳', mobileLabel: 'Pending' },
+  ];
 
   return (
     <>
       <style>{css}</style>
       <div className="dash">
 
+        {/* ── Topbar ── */}
         <header className="topbar">
-          <div className="topbar-left">
-            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Dr. SG Majeke" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <div className="topbar-brand">
+            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="logo"
+              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Dr. SG Majeke</div>
               <div style={{ fontSize: 11, color: '#94a3b8' }}>General Practitioner</div>
             </div>
           </div>
 
-          <div className="topbar-center">
-            <nav className="nav">
-              {[
-                { key: 'calendar', label: 'Calendar' },
-                { key: 'bookings', label: 'Bookings' },
-                { key: 'pending',  label: pending.length ? `Pending (${pending.length})` : 'Pending' },
-              ].map(t => (
-                <button key={t.key} className={`nav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
-                  {t.label}
-                </button>
-              ))}
-            </nav>
-          </div>
+          <nav className="desktop-nav">
+            {tabConfig.map(t => (
+              <button key={t.key} className={`nav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+                {t.label}
+              </button>
+            ))}
+          </nav>
 
-          <div className="topbar-right">
-            <button
-              type="button"
-              className={`ap-btn ${autoPilot ? 'on' : 'off'}`}
+          <div className="topbar-actions">
+            <button type="button" className={`ap-btn ${autoPilot ? 'on' : 'off'}`}
               onClick={() => { if (!autoPilot) autoProcessedRef.current.clear(); setAutoPilot(p => !p); }}
-              title={autoPilot ? 'Auto Pilot ON' : 'Enable Auto Pilot'}
-            >
+              title={autoPilot ? 'Auto Pilot ON' : 'Enable Auto Pilot'}>
               <span className="ap-dot" />
-              <span>Auto Pilot {autoPilot ? 'ON' : 'OFF'}</span>
+              <span className="ap-label">Auto {autoPilot ? 'ON' : 'OFF'}</span>
             </button>
-            {pending.length > 0 && (
-              <span className="pending-badge">{pending.length}</span>
-            )}
-            <div className="header-date" style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
-                {now.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
-              </div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                {now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
+            {pending.length > 0 && <span className="badge-pending">{pending.length}</span>}
           </div>
         </header>
 
+        {/* ── Body ── */}
         <div className="body">
           <main className="main">
 
+            {/* ── Calendar tab ── */}
             {tab === 'calendar' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{monthStr}</div>
+                <div className="cal-nav">
+                  <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}
+                    style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 13, color: '#334155' }}>‹</button>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{monthStr}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}
-                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 14px', fontSize: 13, cursor: 'pointer', color: '#334155' }}>
-                      ←
-                    </button>
                     <button type="button" onClick={() => { setMonth(new Date()); setSelectedDay(today); }}
-                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 14px', fontSize: 12, cursor: 'pointer', color: '#64748b' }}>
-                      Today
-                    </button>
+                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#64748b' }}>Today</button>
                     <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))}
-                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 14px', fontSize: 13, cursor: 'pointer', color: '#334155' }}>
-                      →
-                    </button>
+                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 13, color: '#334155' }}>›</button>
                   </div>
                 </div>
 
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 16 }}>
-                  <div className="cal-grid" style={{ marginBottom: 4 }}>
-                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-                      <div key={d} className="cal-head">{d}</div>
-                    ))}
+                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '12px 10px' }}>
+                  <div className="cal-grid" style={{ marginBottom: 3 }}>
+                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className="cal-head">{d}</div>)}
                   </div>
                   <div className="cal-grid">
                     {weeks.flatMap((wk, wi) => wk.map((cell, di) => {
                       if (!cell) return <div key={`e-${wi}-${di}`} />;
-                      const apts      = forDay(cell.ds);
-                      const isToday   = cell.ds === today;
-                      const isSel     = cell.ds === selectedDay;
-                      const confirmed = apts.filter(a => a.status === 'confirmed');
-                      const pend      = apts.filter(a => a.status === 'pending_approval');
+                      const apts = forDay(cell.ds);
+                      const conf = apts.filter(a => a.status === 'confirmed').length;
+                      const pend = apts.filter(a => a.status === 'pending_approval').length;
+                      const isToday = cell.ds === today;
+                      const isSel   = cell.ds === selectedDay;
                       return (
                         <div key={cell.ds}
                           className={`cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}`}
-                          onClick={() => { setSelectedDay(cell.ds); setShowDayPanel(true); }}>
-                          <div className="cal-day">{cell.day}</div>
-                          <div className="dot-row">
-                            {confirmed.slice(0, 4).map((_, i) => <div key={i} className="dot" style={{ background: '#16a34a' }} />)}
-                            {pend.slice(0, 4).map((_, i)      => <div key={i} className="dot" style={{ background: '#d97706' }} />)}
+                          onClick={() => { setSelectedDay(cell.ds); setSheetOpen(true); }}>
+                          <div className="cal-num">{cell.day}</div>
+                          <div className="cal-dots">
+                            {Array.from({ length: Math.min(conf, 3) }).map((_, i) => <div key={`c${i}`} className="dot" style={{ background: '#16a34a' }} />)}
+                            {Array.from({ length: Math.min(pend, 3) }).map((_, i) => <div key={`p${i}`} className="dot" style={{ background: '#d97706' }} />)}
                           </div>
-                          {apts.length > 0 && (
-                            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{apts.length} apt{apts.length !== 1 ? 's' : ''}</div>
-                          )}
+                          {apts.length > 0 && <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>{apts.length}</div>}
                         </div>
                       );
                     }))}
                   </div>
-
-                  <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
-                    {[['#16a34a', 'Confirmed'], ['#d97706', 'Pending']].map(([c, l]) => (
-                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#64748b' }}>
-                        <div className="dot" style={{ background: c }} />
-                        {l}
+                  <div style={{ display: 'flex', gap: 14, marginTop: 12, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+                    {[['#16a34a','Confirmed'],['#d97706','Pending']].map(([c, l]) => (
+                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#64748b' }}>
+                        <div className="dot" style={{ background: c }} /> {l}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Mobile day panel — shows below calendar on small screens */}
-                {showDayPanel && (
-                  <div className="day-panel-mobile">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                        {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
-                      </div>
-                      <button type="button" onClick={() => setShowDayPanel(false)}
-                        style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94a3b8', padding: '0 4px' }}>✕</button>
+                {/* Desktop: show day appointments below calendar */}
+                {dayApts.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>
+                      {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)} · {dayApts.length} appointment{dayApts.length !== 1 ? 's' : ''}
                     </div>
-                    {dayApts.length === 0
-                      ? <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: '16px 0' }}>No appointments</p>
-                      : dayApts.map((apt, i) => (
-                        <div key={apt.id}>
-                          {i > 0 && <div className="divider" />}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <Avatar name={apt.patient_name} size={30} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
-                              <div style={{ fontSize: 11, color: '#94a3b8' }}>{apt.phone}</div>
-                            </div>
-                            <span style={{ fontWeight: 700, color: '#ea580c', fontSize: 13 }}>{apt.time}</span>
-                            <StatusBadge status={apt.status} />
-                          </div>
-                          {apt.status === 'pending_approval' && (
-                            <div className="action-row">
-                              <button type="button" className="btn-approve" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}>{actionLoading[apt.id] ? '…' : 'Approve'}</button>
-                              <button type="button" className="btn-reject"  disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}>{actionLoading[apt.id] ? '…' : 'Reject'}</button>
-                            </div>
-                          )}
-                          {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>{actionError[apt.id]}</p>}
-                        </div>
-                      ))
-                    }
+                    <div className="card-list">
+                      {dayApts.map(apt => (
+                        <AptCard key={apt.id} apt={apt}
+                          actionLoading={actionLoading[apt.id]}
+                          actionError={actionError[apt.id]}
+                          onApprove={() => handleAction(apt.id, true)}
+                          onReject={() => handleAction(apt.id, false)} />
+                      ))}
+                    </div>
                   </div>
                 )}
               </>
             )}
 
+            {/* ── Bookings tab ── */}
             {tab === 'bookings' && (
               <>
-                <div className="filters-row">
-                  <input type="search" placeholder="Search name or phone…" value={search} onChange={e => setSearch(e.target.value)} />
+                <div className="filter-bar">
+                  <input className="search-input" type="search" placeholder="Search name or phone…"
+                    value={search} onChange={e => setSearch(e.target.value)} />
                   <div className="pill-row">
                     {[['all','All'],['pending_approval','Pending'],['confirmed','Confirmed'],['rejected','Rejected']].map(([k, l]) => (
-                      <button type="button" key={k} className={`filter-pill${filterStatus === k ? ' active' : ''}`} onClick={() => setFilterStatus(k)}>{l}</button>
+                      <button type="button" key={k} className={`pill${filterStatus === k ? ' on' : ''}`} onClick={() => setFilterStatus(k)}>{l}</button>
                     ))}
                   </div>
                 </div>
 
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                {/* Mobile: card list */}
+                <div className="card-list" style={{ display: 'none' }} id="mobile-bookings">
+                  {filtered.map(apt => (
+                    <AptCard key={apt.id} apt={apt}
+                      actionLoading={actionLoading[apt.id]}
+                      actionError={actionError[apt.id]}
+                      onApprove={() => handleAction(apt.id, true)}
+                      onReject={() => handleAction(apt.id, false)} />
+                  ))}
+                </div>
+
+                {/* Desktop: table */}
+                <div className="desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
                   <div className="table-wrap">
                     <table>
                       <thead>
@@ -489,22 +469,22 @@ export default function DoctorDashboard() {
                       </thead>
                       <tbody>
                         {filtered.length === 0 && (
-                          <tr><td colSpan={7} style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8' }}>No appointments found</td></tr>
+                          <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>No appointments found</td></tr>
                         )}
                         {filtered.map(apt => (
                           <tr key={apt.id}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Avatar name={apt.patient_name} size={30} />
+                                <Avatar name={apt.patient_name} size={28} />
                                 <span style={{ fontWeight: 600, color: '#0f172a' }}>{apt.patient_name || 'Unknown'}</span>
                               </div>
                             </td>
-                            <td style={{ color: '#64748b' }}>{apt.phone}</td>
+                            <td style={{ color: '#64748b', fontSize: 12 }}>{apt.phone}</td>
                             <td>
-                              <div style={{ fontWeight: 500 }}>{fmtDate(apt.date)}</div>
+                              <div style={{ fontWeight: 500, fontSize: 12 }}>{fmtDate(apt.date)}</div>
                               <div style={{ fontWeight: 700, color: '#ea580c', fontSize: 12 }}>{apt.time}</div>
                             </td>
-                            <td>
+                            <td style={{ fontSize: 12 }}>
                               {apt.payment_method === 'medical_aid'
                                 ? <div><div style={{ fontWeight: 600 }}>{apt.medical_aid}</div><div style={{ fontSize: 11, color: '#94a3b8' }}>#{apt.membership_number}</div></div>
                                 : <span style={{ color: '#16a34a', fontWeight: 600 }}>Cash</span>}
@@ -514,10 +494,12 @@ export default function DoctorDashboard() {
                             <td>
                               {apt.status === 'pending_approval' && (
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                  <button type="button" className="btn-approve" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}>
+                                  <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
+                                    style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                     {actionLoading[apt.id] ? '…' : 'Approve'}
                                   </button>
-                                  <button type="button" className="btn-reject" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}>
+                                  <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}
+                                    style={{ background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                                     {actionLoading[apt.id] ? '…' : 'Reject'}
                                   </button>
                                 </div>
@@ -529,123 +511,138 @@ export default function DoctorDashboard() {
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ padding: '10px 16px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#94a3b8' }}>
+                  <div style={{ padding: '8px 14px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#94a3b8' }}>
                     {filtered.length} of {appointments.length} appointments
                   </div>
                 </div>
               </>
             )}
 
+            {/* ── Pending tab ── */}
             {tab === 'pending' && (
-              <>
-                {pending.length === 0 ? (
-                  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '64px 32px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#16a34a', marginBottom: 6 }}>No pending approvals</div>
-                    <p style={{ fontSize: 13, color: '#94a3b8' }}>All bookings are up to date</p>
-                  </div>
-                ) : (
-                  <div className="pending-grid">
-                    {pending.map(apt => (
-                      <div key={apt.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', borderTop: '3px solid #d97706', overflow: 'hidden' }}>
-                        <div style={{ padding: 18 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                            <Avatar name={apt.patient_name} size={38} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
-                              <div style={{ fontSize: 12, color: '#64748b' }}>{apt.phone}</div>
-                            </div>
-                            <SourceBadge source={apt.source} />
+              pending.length === 0 ? (
+                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '48px 24px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#16a34a', marginBottom: 6 }}>All clear</div>
+                  <p style={{ fontSize: 13, color: '#94a3b8' }}>No pending approvals</p>
+                </div>
+              ) : (
+                <div className="pending-grid">
+                  {pending.map(apt => (
+                    <div key={apt.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', borderTop: '3px solid #d97706', overflow: 'hidden' }}>
+                      <div style={{ padding: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                          <Avatar name={apt.patient_name} size={38} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>{apt.phone}</div>
+                            <div style={{ marginTop: 3 }}><SourceBadge source={apt.source} /></div>
                           </div>
-
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-                            <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px' }}>
-                              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Date</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{fmtDate(apt.date)}</div>
-                            </div>
-                            <div style={{ background: '#fff7ed', borderRadius: 6, padding: '8px 10px' }}>
-                              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Time</div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>{apt.time}</div>
-                            </div>
-                            <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
-                              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Payment</div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                                {apt.payment_method === 'medical_aid' ? `${apt.medical_aid} · #${apt.membership_number}` : 'Cash'}
-                              </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                          <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Date</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{fmtDate(apt.date)}</div>
+                          </div>
+                          <div style={{ background: '#fff7ed', borderRadius: 6, padding: '8px 10px' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Time</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>{apt.time}</div>
+                          </div>
+                          <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Payment</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                              {apt.payment_method === 'medical_aid' ? `${apt.medical_aid} · #${apt.membership_number}` : 'Cash'}
                             </div>
                           </div>
-
-                          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Submitted {fmtTs(apt.created_at)}</div>
-                          {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 12 }}>{actionError[apt.id]}</p>}
                         </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #f1f5f9' }}>
-                          <button type="button" className="btn-approve" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
-                            style={{ borderRadius: '0 0 0 11px', padding: '12px 0' }}>
-                            {actionLoading[apt.id] ? '…' : 'Approve'}
-                          </button>
-                          <button type="button" className="btn-reject" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}
-                            style={{ borderRadius: '0 0 11px 0', padding: '12px 0', borderLeft: '1px solid #f1f5f9', borderTop: 'none', borderRight: 'none', borderBottom: 'none' }}>
-                            {actionLoading[apt.id] ? '…' : 'Reject'}
-                          </button>
-                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>Submitted {fmtTs(apt.created_at)}</div>
+                        {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 12, marginTop: 6 }}>{actionError[apt.id]}</p>}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #f1f5f9' }}>
+                        <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
+                          style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: '0 0 0 11px', padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1 }}>
+                          {actionLoading[apt.id] ? '…' : 'Approve'}
+                        </button>
+                        <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}
+                          style={{ background: '#fff', color: '#dc2626', border: 'none', borderLeft: '1px solid #f1f5f9', borderRadius: '0 0 11px 0', padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1 }}>
+                          {actionLoading[apt.id] ? '…' : 'Reject'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
 
           </main>
 
+          {/* ── Desktop sidebar ── */}
           <aside className="sidebar">
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                 {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                 {dayApts.length === 0 ? 'No appointments' : `${dayApts.length} appointment${dayApts.length !== 1 ? 's' : ''}`}
               </div>
             </div>
-
-            {dayApts.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: '#cbd5e1', fontSize: 13 }}>
-                Nothing scheduled
-              </div>
-            )}
-
-            {dayApts.map((apt, i) => (
-              <div key={apt.id}>
-                {i > 0 && <div className="divider" />}
-                <div className="apt-card" style={{ borderLeft: `3px solid ${apt.status === 'confirmed' ? '#16a34a' : apt.status === 'rejected' ? '#dc2626' : '#d97706'}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <Avatar name={apt.patient_name} size={30} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{apt.phone}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#ea580c' }}>{apt.time}</span>
-                    <StatusBadge status={apt.status} />
-                  </div>
-                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: apt.status === 'pending_approval' ? 8 : 0 }}>
-                    {apt.payment_method === 'medical_aid' ? `${apt.medical_aid}` : 'Cash'} · <SourceBadge source={apt.source} />
-                  </div>
-                  {apt.status === 'pending_approval' && (
-                    <div className="action-row">
-                      <button type="button" className="btn-approve" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}>
-                        {actionLoading[apt.id] ? '…' : 'Approve'}
-                      </button>
-                      <button type="button" className="btn-reject" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}>
-                        {actionLoading[apt.id] ? '…' : 'Reject'}
-                      </button>
-                    </div>
-                  )}
-                  {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 6 }}>{actionError[apt.id]}</p>}
+            {dayApts.length === 0
+              ? <div style={{ textAlign: 'center', padding: '32px 0', color: '#cbd5e1', fontSize: 13 }}>Nothing scheduled</div>
+              : <div className="card-list">
+                  {dayApts.map(apt => (
+                    <AptCard key={apt.id} apt={apt}
+                      actionLoading={actionLoading[apt.id]}
+                      actionError={actionError[apt.id]}
+                      onApprove={() => handleAction(apt.id, true)}
+                      onReject={() => handleAction(apt.id, false)} />
+                  ))}
                 </div>
-              </div>
-            ))}
+            }
           </aside>
+        </div>
+
+        {/* ── Mobile bottom nav ── */}
+        <nav className="bottom-nav">
+          {tabConfig.map(t => (
+            <button key={t.key} className={`bnav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+              <span className="bnav-icon">{t.icon}</span>
+              <span>{t.mobileLabel || t.key.charAt(0).toUpperCase() + t.key.slice(1)}</span>
+              {t.key === 'pending' && pending.length > 0 && (
+                <span style={{ position: 'absolute', top: 6, background: '#dc2626', color: '#fff', borderRadius: 10, padding: '1px 5px', fontSize: 9, fontWeight: 700 }}>{pending.length}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* ── Mobile bottom sheet (day appointments) ── */}
+        <div className={`sheet-overlay${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
+        <div className={`sheet${sheetOpen ? ' open' : ''}`}>
+          <div className="sheet-handle" />
+          <div className="sheet-header">
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                {dayApts.length === 0 ? 'No appointments' : `${dayApts.length} appointment${dayApts.length !== 1 ? 's' : ''}`}
+              </div>
+            </div>
+            <button type="button" onClick={() => setSheetOpen(false)}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, color: '#64748b' }}>✕</button>
+          </div>
+          <div className="sheet-body">
+            {dayApts.length === 0
+              ? <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '24px 0' }}>Nothing scheduled for this day</p>
+              : <div className="card-list">
+                  {dayApts.map(apt => (
+                    <AptCard key={apt.id} apt={apt}
+                      actionLoading={actionLoading[apt.id]}
+                      actionError={actionError[apt.id]}
+                      onApprove={() => handleAction(apt.id, true)}
+                      onReject={() => handleAction(apt.id, false)} />
+                  ))}
+                </div>
+            }
+          </div>
         </div>
 
       </div>

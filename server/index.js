@@ -80,12 +80,16 @@ app.post('/webhook', async (req, res) => {
   const phone = (req.body.From || '').replace('whatsapp:', '');
   const text  = (req.body.Body || '').trim();
 
+  console.log(`Webhook: from=${phone} text="${text}"`);
+
   if (!phone) return res.status(400).send('Missing From');
 
   try {
     const conversation  = await getOrCreateConversation(db, phone);
     let nextState       = conversation.current_state;
     const collectedData = conversation.collected_data || {};
+
+    console.log(`State: ${nextState}`);
 
     try {
       if (nextState === 'initial') {

@@ -13,11 +13,19 @@ function getClient() {
 
 async function sendWhatsAppMessage(phone, text) {
   const client = getClient();
-  return client.messages.create({
-    from: `whatsapp:${FROM_NUMBER}`,
-    to:   `whatsapp:${phone}`,
-    body: text,
-  });
+  console.log(`Sending to ${phone}: "${text.substring(0, 60)}..."`);
+  try {
+    const msg = await client.messages.create({
+      from: `whatsapp:${FROM_NUMBER}`,
+      to:   `whatsapp:${phone}`,
+      body: text,
+    });
+    console.log(`Sent OK sid=${msg.sid} status=${msg.status}`);
+    return msg;
+  } catch (err) {
+    console.error(`Send failed: ${err.message} (code=${err.code})`);
+    throw err;
+  }
 }
 
 async function sendWhatsAppButtons(phone, prompt, buttons) {

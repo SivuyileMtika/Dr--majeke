@@ -92,6 +92,9 @@ app.post('/webhook', async (req, res) => {
     console.log(`State: ${nextState}`);
 
     try {
+      if (nextState === 'complete') {
+        nextState = 'initial';
+      }
       if (nextState === 'initial') {
         nextState = await handleInitialMessage(db, phone, text);
       } else if (nextState === 'menu') {

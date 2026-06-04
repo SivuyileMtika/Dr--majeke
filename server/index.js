@@ -217,6 +217,6 @@ app.post('/book', async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => res.json({ ok: true, service: 'WhatsApp Booking System (Twilio)' }));
+app.get('/', (req, res) => res.json({ ok: true, service: 'WhatsApp Booking System (Twilio)', v: 2 }));
 
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

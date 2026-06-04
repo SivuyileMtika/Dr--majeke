@@ -67,6 +67,7 @@ export default function DoctorDashboard() {
   const [actionError, setActionError]     = useState({});
   const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
   const autoProcessedRef                  = React.useRef(new Set());
+  const [showDayPanel, setShowDayPanel]   = useState(false);
   const [now, setNow]                     = useState(new Date());
 
   useEffect(() => {
@@ -144,123 +145,145 @@ export default function DoctorDashboard() {
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
+    body { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; -webkit-text-size-adjust: 100%; }
 
     .dash { display: flex; flex-direction: column; min-height: 100vh; }
 
+    /* ── Topbar ── */
     .topbar {
-      background: #fff;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 0 28px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 40;
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: 0 24px; min-height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 40; gap: 8px; flex-wrap: wrap;
     }
-    .topbar-left  { display: flex; align-items: center; gap: 10px; }
-    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .topbar-left  { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .topbar-center { display: flex; flex: 1; justify-content: center; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
-    .nav { display: flex; gap: 2px; }
+    /* ── Nav ── */
+    .nav { display: flex; gap: 2px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
     .nav-btn {
       background: none; border: none;
-      padding: 6px 14px; border-radius: 6px;
+      padding: 6px 12px; border-radius: 6px;
       font-size: 13px; font-weight: 500;
       color: #64748b; cursor: pointer;
       transition: background .15s, color .15s;
-      white-space: nowrap;
+      white-space: nowrap; flex-shrink: 0;
     }
     .nav-btn:hover  { background: #f1f5f9; color: #0f172a; }
     .nav-btn.active { background: #fff7ed; color: #ea580c; font-weight: 600; }
 
-    .body { display: flex; flex: 1; overflow: hidden; }
-
-    .main { flex: 1; overflow-y: auto; padding: 24px 28px; }
-
+    /* ── Body layout ── */
+    .body { display: flex; flex: 1; min-height: 0; }
+    .main { flex: 1; overflow-y: auto; padding: 24px 24px; min-width: 0; }
     .sidebar {
-      width: 300px;
-      min-width: 300px;
+      width: 290px; min-width: 290px; flex-shrink: 0;
       border-left: 1px solid #e2e8f0;
-      background: #fff;
-      overflow-y: auto;
-      padding: 20px;
+      background: #fff; overflow-y: auto; padding: 20px;
     }
 
-    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    /* ── Calendar ── */
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
     .cal-head { font-size: 10px; font-weight: 700; color: #94a3b8; text-align: center; padding: 6px 0; text-transform: uppercase; letter-spacing: .5px; }
     .cal-cell {
-      border-radius: 8px;
-      min-height: 72px;
-      padding: 6px;
-      cursor: pointer;
-      transition: background .12s;
-      position: relative;
-      border: 1px solid transparent;
+      border-radius: 6px; min-height: 68px; padding: 5px;
+      cursor: pointer; transition: background .12s;
+      border: 1px solid transparent; overflow: hidden;
     }
     .cal-cell:hover    { background: #f8fafc; border-color: #e2e8f0; }
     .cal-cell.today    { background: #fff7ed; border-color: #fdba74; }
     .cal-cell.selected { background: #fff7ed; border-color: #ea580c; }
-    .cal-cell.has-apts { }
-    .cal-day { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 4px; }
+    .cal-day { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
     .cal-cell.today .cal-day    { color: #ea580c; font-weight: 700; }
     .cal-cell.selected .cal-day { color: #ea580c; font-weight: 700; }
-
     .dot-row { display: flex; flex-wrap: wrap; gap: 2px; }
     .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
+    /* ── Mobile day panel ── */
+    .day-panel-mobile {
+      display: none;
+      background: #fff; border-top: 1px solid #e2e8f0;
+      padding: 16px; margin-top: 16px;
+      border-radius: 12px; border: 1px solid #e2e8f0;
+    }
+
+    /* ── Appointment card in sidebar ── */
     .apt-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 10px;
-      background: #fff;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      padding: 12px; margin-bottom: 10px; background: #fff;
     }
     .apt-card:last-child { margin-bottom: 0; }
+    .divider { height: 1px; background: #f1f5f9; margin: 10px 0; }
+    .action-row { display: flex; gap: 8px; margin-top: 10px; }
 
-    .divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
-
-    .action-row { display: flex; gap: 8px; margin-top: 12px; }
-    .btn-approve { background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: '7px 16px'; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 7px 0; }
+    /* ── Buttons ── */
+    .btn-approve { background: #16a34a; color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 8px 0; }
     .btn-approve:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-reject  { background: #fff; color: #dc2626; border: 1px solid #dc2626; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 7px 0; }
+    .btn-reject  { background: #fff; color: #dc2626; border: 1px solid #dc2626; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; flex: 1; padding: 8px 0; }
     .btn-reject:disabled  { opacity: .5; cursor: not-allowed; }
 
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
-    th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
+    th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
     tr:hover td { background: #f8fafc; }
     tr:last-child td { border-bottom: none; }
 
-    input[type="search"] { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; font-size: 13px; color: #334155; width: 220px; }
+    /* ── Filters ── */
+    .filters-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    input[type="search"] { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; font-size: 13px; color: #334155; min-width: 0; flex: 1; max-width: 240px; }
     input[type="search"]:focus { outline: 2px solid #ea580c; outline-offset: 1px; }
-
-    .filter-pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; white-space: nowrap; }
+    .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .filter-pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; white-space: nowrap; }
     .filter-pill.active { background: #ea580c; border-color: #ea580c; color: #fff; font-weight: 600; }
 
-    .pending-badge { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    /* ── Pending cards ── */
+    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
 
-    .ap-btn { display: flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+    /* ── Badges ── */
+    .pending-badge { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .ap-btn { display: flex; align-items: center; gap: 6px; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; white-space: nowrap; }
     .ap-btn.on  { background: #16a34a; color: #fff; }
     .ap-btn.off { background: #f1f5f9; color: #64748b; }
     .ap-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .ap-btn.on  .ap-dot { background: #fff; animation: pulse 1.4s infinite; }
     .ap-btn.off .ap-dot { background: #94a3b8; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes spin  { to { transform: rotate(360deg); } }
     .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 1s linear infinite; }
 
-    @media (max-width: 900px) {
-      .sidebar { display: none; }
-      .main { padding: 16px; }
-      .topbar { padding: 0 16px; }
+    /* ── Tablet (≤ 1024px) ── */
+    @media (max-width: 1024px) {
+      .sidebar { width: 260px; min-width: 260px; }
     }
-    @media (max-width: 640px) {
-      .topbar-right .header-date { display: none; }
-      input[type="search"] { width: 140px; }
+
+    /* ── Mobile (≤ 768px) ── */
+    @media (max-width: 768px) {
+      .topbar { padding: 0 14px; min-height: 52px; }
+      .topbar-center { justify-content: flex-start; }
+      .sidebar { display: none; }
+      .main { padding: 14px; }
+      .day-panel-mobile { display: block; }
+      .cal-cell { min-height: 52px; padding: 4px; }
+      .cal-day { font-size: 11px; }
+      .dot { width: 5px; height: 5px; }
+      .header-date { display: none; }
+      input[type="search"] { max-width: 100%; }
+      .pending-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Small mobile (≤ 480px) ── */
+    @media (max-width: 480px) {
+      .topbar { flex-wrap: wrap; padding: 8px 14px; height: auto; gap: 8px; }
+      .topbar-left { flex: 1; }
+      .topbar-right { gap: 6px; }
+      .nav-btn { padding: 6px 10px; font-size: 12px; }
+      .ap-btn span:last-child { display: none; }
+      .cal-cell { min-height: 44px; }
+      .cal-head { font-size: 9px; letter-spacing: 0; }
     }
   `;
 
@@ -291,37 +314,39 @@ export default function DoctorDashboard() {
 
         <header className="topbar">
           <div className="topbar-left">
-            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Dr. SG Majeke" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Dr. SG Majeke" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Dr. SG Majeke</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>General Practitioner · Mt Frere</div>
+              <div style={{ fontSize: 11, color: '#94a3b8' }}>General Practitioner</div>
             </div>
           </div>
 
-          <nav className="nav">
-            {[
-              { key: 'calendar',  label: 'Calendar' },
-              { key: 'bookings',  label: 'Bookings' },
-              { key: 'pending',   label: pending.length ? `Pending (${pending.length})` : 'Pending' },
-            ].map(t => (
-              <button key={t.key} className={`nav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <div className="topbar-center">
+            <nav className="nav">
+              {[
+                { key: 'calendar', label: 'Calendar' },
+                { key: 'bookings', label: 'Bookings' },
+                { key: 'pending',  label: pending.length ? `Pending (${pending.length})` : 'Pending' },
+              ].map(t => (
+                <button key={t.key} className={`nav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
           <div className="topbar-right">
             <button
               type="button"
               className={`ap-btn ${autoPilot ? 'on' : 'off'}`}
               onClick={() => { if (!autoPilot) autoProcessedRef.current.clear(); setAutoPilot(p => !p); }}
-              title={autoPilot ? 'Auto Pilot ON — approves first-come bookings automatically' : 'Enable Auto Pilot'}
+              title={autoPilot ? 'Auto Pilot ON' : 'Enable Auto Pilot'}
             >
               <span className="ap-dot" />
-              Auto Pilot {autoPilot ? 'ON' : 'OFF'}
+              <span>Auto Pilot {autoPilot ? 'ON' : 'OFF'}</span>
             </button>
             {pending.length > 0 && (
-              <span className="pending-badge">{pending.length} pending</span>
+              <span className="pending-badge">{pending.length}</span>
             )}
             <div className="header-date" style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
@@ -374,7 +399,7 @@ export default function DoctorDashboard() {
                       return (
                         <div key={cell.ds}
                           className={`cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}`}
-                          onClick={() => setSelectedDay(cell.ds)}>
+                          onClick={() => { setSelectedDay(cell.ds); setShowDayPanel(true); }}>
                           <div className="cal-day">{cell.day}</div>
                           <div className="dot-row">
                             {confirmed.slice(0, 4).map((_, i) => <div key={i} className="dot" style={{ background: '#16a34a' }} />)}
@@ -397,14 +422,51 @@ export default function DoctorDashboard() {
                     ))}
                   </div>
                 </div>
+
+                {/* Mobile day panel — shows below calendar on small screens */}
+                {showDayPanel && (
+                  <div className="day-panel-mobile">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                        {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
+                      </div>
+                      <button type="button" onClick={() => setShowDayPanel(false)}
+                        style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94a3b8', padding: '0 4px' }}>✕</button>
+                    </div>
+                    {dayApts.length === 0
+                      ? <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: '16px 0' }}>No appointments</p>
+                      : dayApts.map((apt, i) => (
+                        <div key={apt.id}>
+                          {i > 0 && <div className="divider" />}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <Avatar name={apt.patient_name} size={30} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
+                              <div style={{ fontSize: 11, color: '#94a3b8' }}>{apt.phone}</div>
+                            </div>
+                            <span style={{ fontWeight: 700, color: '#ea580c', fontSize: 13 }}>{apt.time}</span>
+                            <StatusBadge status={apt.status} />
+                          </div>
+                          {apt.status === 'pending_approval' && (
+                            <div className="action-row">
+                              <button type="button" className="btn-approve" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}>{actionLoading[apt.id] ? '…' : 'Approve'}</button>
+                              <button type="button" className="btn-reject"  disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}>{actionLoading[apt.id] ? '…' : 'Reject'}</button>
+                            </div>
+                          )}
+                          {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>{actionError[apt.id]}</p>}
+                        </div>
+                      ))
+                    }
+                  </div>
+                )}
               </>
             )}
 
             {tab === 'bookings' && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+                <div className="filters-row">
                   <input type="search" placeholder="Search name or phone…" value={search} onChange={e => setSearch(e.target.value)} />
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div className="pill-row">
                     {[['all','All'],['pending_approval','Pending'],['confirmed','Confirmed'],['rejected','Rejected']].map(([k, l]) => (
                       <button type="button" key={k} className={`filter-pill${filterStatus === k ? ' active' : ''}`} onClick={() => setFilterStatus(k)}>{l}</button>
                     ))}
@@ -482,7 +544,7 @@ export default function DoctorDashboard() {
                     <p style={{ fontSize: 13, color: '#94a3b8' }}>All bookings are up to date</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+                  <div className="pending-grid">
                     {pending.map(apt => (
                       <div key={apt.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', borderTop: '3px solid #d97706', overflow: 'hidden' }}>
                         <div style={{ padding: 18 }}>

@@ -35,7 +35,7 @@ async function confirmAppointmentHandler(db, req, res) {
 
     const apt    = snap.data();
     const status = confirm ? 'confirmed' : 'rejected';
-    const clinic = doctorName || 'Dr. S Mtika';
+    const clinic = doctorName || 'Dr. SG Majeke';
 
     await ref.update({
       status,

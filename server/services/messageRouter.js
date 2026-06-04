@@ -11,7 +11,7 @@ function fmtDateLabel(dateStr) {
 async function handleInitialMessage(db, phone, text) {
   const t = text.toLowerCase().trim();
   if (t === 'hi' || t === 'hello' || t === 'start') {
-    await sendWhatsAppButtons(phone, 'Welcome to Dr. S Mtika Clinic! What would you like to do?', [
+    await sendWhatsAppButtons(phone, 'Welcome to Dr. SG Majeke\'s practice! What would you like to do?', [
       'Book Appointment',
       'View Price List',
     ]);

@@ -1,75 +1,94 @@
-const twilio = require('twilio');
+const axios = require('axios');
 
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN;
-const FROM_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
+const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const ACCESS_TOKEN    = process.env.WHATSAPP_ACCESS_TOKEN;
 
-const sidCache = new Map();
+function apiUrl() {
+  return `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`;
+}
 
-function getClient() {
-  if (!ACCOUNT_SID || !AUTH_TOKEN) throw new Error('Twilio credentials not set');
-  return twilio(ACCOUNT_SID, AUTH_TOKEN);
+// Meta expects E.164 without '+': '27762677268'
+function normalizePhone(phone) {
+  return String(phone).replace(/^\+/, '').replace(/\D/g, '');
+}
+
+async function callApi(payload) {
+  const res = await axios.post(apiUrl(), payload, {
+    headers: {
+      Authorization: `Bearer ${ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  return res.data;
 }
 
 async function sendWhatsAppMessage(phone, text) {
-  const client = getClient();
-  console.log(`Sending to ${phone}: "${text.substring(0, 60)}..."`);
+  const to = normalizePhone(phone);
+  console.log(`Sending text to ${to}: "${text.substring(0, 80)}"`);
   try {
-    const msg = await client.messages.create({
-      from: `whatsapp:${FROM_NUMBER}`,
-      to:   `whatsapp:${phone}`,
-      body: text,
+    const data = await callApi({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { body: text },
     });
-    console.log(`Sent OK sid=${msg.sid} status=${msg.status}`);
-    return msg;
+    console.log(`Sent OK: ${data.messages?.[0]?.id}`);
+    return data;
   } catch (err) {
-    console.error(`Send failed: ${err.message} (code=${err.code})`);
+    const detail = err.response?.data?.error?.message || err.message;
+    console.error(`Send failed: ${detail}`);
     throw err;
   }
 }
 
 async function sendWhatsAppButtons(phone, prompt, buttons) {
-  const client = getClient();
-  const key    = prompt + '\x00' + buttons.join('\x00');
-
+  const to = normalizePhone(phone);
   try {
-    let contentSid = sidCache.get(key);
+    let payload;
 
-    if (!contentSid) {
-      const content = buttons.length <= 3
-        ? await client.content.v1.contents.create({
-            friendlyName: `qr_${Date.now()}`,
-            types: {
-              'twilio/quick-reply': {
-                body:    prompt,
-                actions: buttons.map((btn, i) => ({ id: `btn_${i}`, title: btn.substring(0, 20) })),
-              },
-            },
-          })
-        : await client.content.v1.contents.create({
-            friendlyName: `list_${Date.now()}`,
-            types: {
-              'twilio/list-picker': {
-                body:     prompt,
-                button:   'Select',
-                sections: [{
-                  items: buttons.slice(0, 10).map((btn, i) => ({ id: `item_${i}`, item: btn.substring(0, 24) })),
-                }],
-              },
-            },
-          });
-
-      contentSid = content.sid;
-      sidCache.set(key, contentSid);
+    if (buttons.length <= 3) {
+      payload = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: prompt },
+          action: {
+            buttons: buttons.map((btn, i) => ({
+              type: 'reply',
+              reply: { id: `btn_${i}`, title: btn.substring(0, 20) },
+            })),
+          },
+        },
+      };
+    } else {
+      payload = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: { text: prompt },
+          action: {
+            button: 'Select',
+            sections: [{
+              rows: buttons.slice(0, 10).map((btn, i) => ({
+                id: `item_${i}`,
+                title: btn.substring(0, 24),
+              })),
+            }],
+          },
+        },
+      };
     }
 
-    return client.messages.create({
-      from: `whatsapp:${FROM_NUMBER}`,
-      to:   `whatsapp:${phone}`,
-      contentSid,
-    });
+    const data = await callApi(payload);
+    console.log(`Interactive sent OK: ${data.messages?.[0]?.id}`);
+    return data;
   } catch (err) {
-    console.warn('Content API failed, falling back to text:', err.message);
+    const detail = err.response?.data?.error?.message || err.message;
+    console.warn(`Interactive failed, falling back to text: ${detail}`);
     const numbered = buttons.map((btn, i) => `${i + 1}. ${btn}`).join('\n');
     return sendWhatsAppMessage(phone, `${prompt}\n\n${numbered}\n\nReply with the number of your choice.`);
   }

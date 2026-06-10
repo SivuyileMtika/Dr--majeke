@@ -1,5 +1,4 @@
 const admin  = require('firebase-admin');
-const twilio = require('twilio');
 const { markSlotConfirmed } = require('../utils/fireStoreHelpers');
 const { sendWhatsAppMessage } = require('../utils/whatsappButtons');
 
@@ -9,15 +8,8 @@ function toE164(phone) {
   if (digits.startsWith('27') && digits.length === 11) return `+${digits}`;
   if (digits.startsWith('0')  && digits.length === 10) return `+27${digits.slice(1)}`;
   if (digits.length === 9) return `+27${digits}`;
-  if (digits.startsWith('+')) return phone;
+  if (phone.startsWith('+')) return phone;
   return `+${digits}`;
-}
-
-async function sendSms(to, body) {
-  const from = process.env.TWILIO_SMS_NUMBER;
-  if (!from) throw new Error('TWILIO_SMS_NUMBER not set');
-  return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-    .messages.create({ from, to, body });
 }
 
 async function confirmAppointmentHandler(db, req, res) {
@@ -43,13 +35,6 @@ async function confirmAppointmentHandler(db, req, res) {
       approved_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    const date        = new Date(`${apt.date}T${apt.time}`);
-    const dateDisplay = date.toLocaleDateString('en-ZA', { weekday: 'long', month: 'long', day: 'numeric' });
-
-    const message = confirm
-      ? `Hello ${apt.patient_name}, your appointment on ${dateDisplay} at ${apt.time} has been CONFIRMED. Please arrive 10 minutes early. - ${clinic}`
-      : `Hello ${apt.patient_name}, your appointment request for ${dateDisplay} at ${apt.time} has been declined. Please call us to reschedule. - ${clinic}`;
-
     if (confirm) {
       const slots = await db.collection('time_slots')
         .where('date', '==', apt.date)
@@ -58,19 +43,18 @@ async function confirmAppointmentHandler(db, req, res) {
       if (!slots.empty) await markSlotConfirmed(db, slots.docs[0].id);
     }
 
-    const phone = toE164(apt.phone);
+    const date        = new Date(`${apt.date}T${apt.time}`);
+    const dateDisplay = date.toLocaleDateString('en-ZA', { weekday: 'long', month: 'long', day: 'numeric' });
 
-    if (apt.source === 'website') {
-      try {
-        await sendSms(phone, message);
-      } catch (smsErr) {
-        console.error('SMS failed, trying WhatsApp:', smsErr.message);
-        try { await sendWhatsAppMessage(phone, message); }
-        catch (waErr) { console.error('WhatsApp also failed:', waErr.message); }
-      }
-    } else {
-      try { await sendWhatsAppMessage(phone, message); }
-      catch (waErr) { console.error('WhatsApp failed:', waErr.message); }
+    const message = confirm
+      ? `Hello ${apt.patient_name}, your appointment on ${dateDisplay} at ${apt.time} has been CONFIRMED. Please arrive 10 minutes early. - ${clinic}`
+      : `Hello ${apt.patient_name}, your appointment request for ${dateDisplay} at ${apt.time} has been declined. Please call us to reschedule. - ${clinic}`;
+
+    const phone = toE164(apt.phone);
+    try {
+      await sendWhatsAppMessage(phone, message);
+    } catch (waErr) {
+      console.error('WhatsApp notification failed:', waErr.message);
     }
 
     return res.json({ success: true, status });

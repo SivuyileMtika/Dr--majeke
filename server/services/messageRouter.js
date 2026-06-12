@@ -1,23 +1,36 @@
 const { sendWhatsAppMessage, sendWhatsAppButtons } = require('../utils/whatsappButtons');
 const { getServices, getMedicalAids, getAvailableDates, getAvailableSlots } = require('../utils/fireStoreHelpers');
 
-// "2026-05-19" → "Mon, 19 May"
 function fmtDateLabel(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
     weekday: 'short', day: 'numeric', month: 'short',
   });
 }
 
+function isBack(text) {
+  return text.toLowerCase().trim() === 'back';
+}
+
+async function sendMainMenu(phone) {
+  await sendWhatsAppButtons(phone, "Welcome to Dr. SG Majeke's practice! What would you like to do?", [
+    'Book Appointment',
+    'View Price List',
+  ]);
+}
+
+async function sendPaymentMenu(phone) {
+  await sendWhatsAppButtons(phone, 'How will you pay?', ['Medical Aid', 'Cash', 'Back']);
+}
+
+async function sendMedicalAidList(db, phone) {
+  const aids = await getMedicalAids(db);
+  await sendWhatsAppButtons(phone, 'Select your medical aid:', [...aids.map(a => a.name), 'Other', 'Back']);
+  return aids;
+}
+
 async function handleInitialMessage(db, phone, text) {
-  const t = text.toLowerCase().trim();
-  if (t === 'hi' || t === 'hello' || t === 'start') {
-    await sendWhatsAppButtons(phone, 'Welcome to Dr. SG Majeke\'s practice! What would you like to do?', [
-      'Book Appointment',
-      'View Price List',
-    ]);
-    return 'menu';
-  }
-  return 'initial';
+  await sendMainMenu(phone);
+  return 'menu';
 }
 
 async function handleMenuSelection(db, phone, selection) {
@@ -28,7 +41,7 @@ async function handleMenuSelection(db, phone, selection) {
       await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
       return 'menu';
     }
-    await sendWhatsAppButtons(phone, 'Select an appointment date:', dates.map(fmtDateLabel));
+    await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
   if (s === '2' || s.toLowerCase().includes('price')) {
@@ -42,12 +55,18 @@ async function handleMenuSelection(db, phone, selection) {
     await sendWhatsAppButtons(phone, 'What would you like to do?', ['Book Appointment', 'Back']);
     return 'menu';
   }
+  await sendMainMenu(phone);
   return 'menu';
 }
 
 async function handleDateSelection(db, phone, selectedDate, conversationData) {
+  if (isBack(selectedDate)) {
+    await sendMainMenu(phone);
+    return 'menu';
+  }
+
   const dates = await getAvailableDates(db);
-  const s     = selectedDate.trim();
+  const s = selectedDate.trim();
 
   let dateIndex = -1;
   const num = parseInt(s, 10);
@@ -62,7 +81,7 @@ async function handleDateSelection(db, phone, selectedDate, conversationData) {
       await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
       return 'menu';
     }
-    await sendWhatsAppButtons(phone, 'Please select a date from the list:', dates.map(fmtDateLabel));
+    await sendWhatsAppButtons(phone, 'Please select a date from the list:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
 
@@ -72,22 +91,33 @@ async function handleDateSelection(db, phone, selectedDate, conversationData) {
   const slots = await getAvailableSlots(db, fullDate);
   if (slots.length === 0) {
     await sendWhatsAppMessage(phone, `No available slots on ${fmtDateLabel(fullDate)}. Please choose another date.`);
-    await sendWhatsAppButtons(phone, 'Select a different date:', dates.map(fmtDateLabel));
+    await sendWhatsAppButtons(phone, 'Select a different date:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
 
-  await sendWhatsAppButtons(phone, `Available times on ${fmtDateLabel(fullDate)}:`, slots.map(sl => sl.time));
+  await sendWhatsAppButtons(phone, `Available times on ${fmtDateLabel(fullDate)}:`, [...slots.map(sl => sl.time), 'Back']);
   return 'selecting_time';
 }
 
 async function handleTimeSelection(db, phone, selectedTime, conversationData) {
+  if (isBack(selectedTime)) {
+    const dates = await getAvailableDates(db);
+    if (dates.length === 0) {
+      await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
+      return 'menu';
+    }
+    await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
+    return 'selecting_date';
+  }
+
   if (!conversationData.selected_date) {
-    await sendWhatsAppMessage(phone, 'Please select a date first.');
+    const dates = await getAvailableDates(db);
+    await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
 
   const slots = await getAvailableSlots(db, conversationData.selected_date);
-  const s     = selectedTime.trim();
+  const s = selectedTime.trim();
 
   const num = parseInt(s, 10);
   const slot = (!isNaN(num) && num >= 1 && num <= slots.length)
@@ -95,44 +125,66 @@ async function handleTimeSelection(db, phone, selectedTime, conversationData) {
     : slots.find(sl => sl.time === s);
 
   if (!slot) {
-    await sendWhatsAppButtons(phone, 'That slot is no longer available. Please choose another time:', slots.map(sl => sl.time));
+    if (slots.length === 0) {
+      await sendWhatsAppMessage(phone, `No available slots on ${fmtDateLabel(conversationData.selected_date)}. Please choose another date.`);
+      const dates = await getAvailableDates(db);
+      await sendWhatsAppButtons(phone, 'Select a different date:', [...dates.map(fmtDateLabel), 'Back']);
+      return 'selecting_date';
+    }
+    await sendWhatsAppButtons(phone, 'That slot is no longer available. Please choose another time:', [...slots.map(sl => sl.time), 'Back']);
     return 'selecting_time';
   }
 
   conversationData.selected_slot_id = slot.id;
   conversationData.selected_time    = slot.time;
 
-  await sendWhatsAppButtons(phone, 'How will you pay?', ['Medical Aid', 'Cash']);
+  await sendPaymentMenu(phone);
   return 'payment_method';
 }
 
 async function handlePaymentMethod(db, phone, method, conversationData) {
+  if (isBack(method)) {
+    if (conversationData.selected_date) {
+      const slots = await getAvailableSlots(db, conversationData.selected_date);
+      await sendWhatsAppButtons(phone, `Available times on ${fmtDateLabel(conversationData.selected_date)}:`, [...slots.map(sl => sl.time), 'Back']);
+      return 'selecting_time';
+    }
+    const dates = await getAvailableDates(db);
+    await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
+    return 'selecting_date';
+  }
+
   const m         = method.trim();
   const isMedical = m === '1' || m.toLowerCase().includes('medical');
   const isCash    = m === '2' || m.toLowerCase().includes('cash');
 
   if (isMedical) {
-    const aids = await getMedicalAids(db);
-    if (aids.length === 0) {
-      await sendWhatsAppMessage(phone, 'No medical aids available. Please choose Cash.');
-      return 'payment_method';
-    }
     conversationData.payment_method = 'medical_aid';
-    await sendWhatsAppButtons(phone, 'Select your medical aid:', aids.map(a => a.name));
+    await sendMedicalAidList(db, phone);
     return 'medical_aid_select';
   }
   if (isCash) {
     conversationData.payment_method = 'cash';
-    await sendWhatsAppMessage(phone, 'Please enter your full name:');
+    await sendWhatsAppMessage(phone, 'Please enter your full name:\n\nType *Back* to change payment method.');
     return 'patient_name';
   }
-  await sendWhatsAppButtons(phone, 'How will you pay?', ['Medical Aid', 'Cash']);
+  await sendPaymentMenu(phone);
   return 'payment_method';
 }
 
 async function handleMedicalAidSelection(db, phone, selectedAid, conversationData) {
+  if (isBack(selectedAid)) {
+    await sendPaymentMenu(phone);
+    return 'payment_method';
+  }
+
   const aids = await getMedicalAids(db);
   const s    = selectedAid.trim();
+
+  if (s.toLowerCase() === 'other') {
+    await sendWhatsAppMessage(phone, 'Please type the name of your medical aid:\n\nType *Back* to go back.');
+    return 'medical_aid_custom';
+  }
 
   const num = parseInt(s, 10);
   const aid = (!isNaN(num) && num >= 1 && num <= aids.length)
@@ -140,25 +192,51 @@ async function handleMedicalAidSelection(db, phone, selectedAid, conversationDat
     : aids.find(a => a.name.toLowerCase() === s.toLowerCase());
 
   if (!aid) {
-    await sendWhatsAppButtons(phone, 'Please select your medical aid from the list:', aids.map(a => a.name));
+    await sendWhatsAppButtons(phone, 'Please select your medical aid from the list:', [...aids.map(a => a.name), 'Other', 'Back']);
     return 'medical_aid_select';
   }
   conversationData.medical_aid = aid.name;
-  await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:');
+  await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
+  return 'membership_number';
+}
+
+async function handleMedicalAidCustom(db, phone, text, conversationData) {
+  if (isBack(text)) {
+    await sendMedicalAidList(db, phone);
+    return 'medical_aid_select';
+  }
+  if (!text || text.trim().length < 2) {
+    await sendWhatsAppMessage(phone, 'Please type the name of your medical aid:\n\nType *Back* to go back.');
+    return 'medical_aid_custom';
+  }
+  conversationData.medical_aid = text.trim();
+  await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
   return 'membership_number';
 }
 
 async function handleMembershipNumber(db, phone, membershipNumber, conversationData) {
+  if (isBack(membershipNumber)) {
+    await sendMedicalAidList(db, phone);
+    return 'medical_aid_select';
+  }
   if (!membershipNumber || membershipNumber.trim().length < 3) {
-    await sendWhatsAppMessage(phone, 'Please enter a valid membership number:');
+    await sendWhatsAppMessage(phone, 'Please enter a valid membership number:\n\nType *Back* to change medical aid.');
     return 'membership_number';
   }
   conversationData.membership_number = membershipNumber.trim();
-  await sendWhatsAppMessage(phone, 'Please enter your full name:');
+  await sendWhatsAppMessage(phone, 'Please enter your full name:\n\nType *Back* to re-enter membership number.');
   return 'patient_name';
 }
 
 async function handlePatientName(db, phone, name, conversationData) {
+  if (isBack(name)) {
+    if (conversationData.payment_method === 'medical_aid') {
+      await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
+      return 'membership_number';
+    }
+    await sendPaymentMenu(phone);
+    return 'payment_method';
+  }
   if (!name || name.trim().length < 2 || name.trim().length > 100) {
     await sendWhatsAppMessage(phone, 'Please enter your full name:');
     return 'patient_name';
@@ -175,7 +253,7 @@ async function handlePatientName(db, phone, name, conversationData) {
       : 'Cash'}`;
 
   await sendWhatsAppMessage(phone, summary);
-  await sendWhatsAppButtons(phone, 'Confirm your booking?', ['Confirm Booking', 'Cancel']);
+  await sendWhatsAppButtons(phone, 'Confirm your booking?', ['Confirm Booking', 'Cancel', 'Back']);
   return 'confirm_details';
 }
 
@@ -186,6 +264,7 @@ module.exports = {
   handleTimeSelection,
   handlePaymentMethod,
   handleMedicalAidSelection,
+  handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
 };

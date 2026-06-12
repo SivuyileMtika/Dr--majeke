@@ -20,6 +20,7 @@ const {
   handleTimeSelection,
   handlePaymentMethod,
   handleMedicalAidSelection,
+  handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
 } = require('./services/messageRouter');
@@ -141,17 +142,21 @@ async function processWebhook(body) {
           try {
             if (nextState === 'complete') nextState = 'initial';
 
-            if      (nextState === 'initial')          nextState = await handleInitialMessage(db, phone, text);
-            else if (nextState === 'menu')             nextState = await handleMenuSelection(db, phone, text);
-            else if (nextState === 'selecting_date')   nextState = await handleDateSelection(db, phone, text, collectedData);
-            else if (nextState === 'selecting_time')   nextState = await handleTimeSelection(db, phone, text, collectedData);
-            else if (nextState === 'payment_method')   nextState = await handlePaymentMethod(db, phone, text, collectedData);
+            if      (nextState === 'initial')            nextState = await handleInitialMessage(db, phone, text);
+            else if (nextState === 'menu')               nextState = await handleMenuSelection(db, phone, text);
+            else if (nextState === 'selecting_date')     nextState = await handleDateSelection(db, phone, text, collectedData);
+            else if (nextState === 'selecting_time')     nextState = await handleTimeSelection(db, phone, text, collectedData);
+            else if (nextState === 'payment_method')     nextState = await handlePaymentMethod(db, phone, text, collectedData);
             else if (nextState === 'medical_aid_select') nextState = await handleMedicalAidSelection(db, phone, text, collectedData);
+            else if (nextState === 'medical_aid_custom') nextState = await handleMedicalAidCustom(db, phone, text, collectedData);
             else if (nextState === 'membership_number')  nextState = await handleMembershipNumber(db, phone, text, collectedData);
-            else if (nextState === 'patient_name')     nextState = await handlePatientName(db, phone, text, collectedData);
+            else if (nextState === 'patient_name')       nextState = await handlePatientName(db, phone, text, collectedData);
             else if (nextState === 'confirm_details') {
               const t = text.toLowerCase();
-              if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
+              if (t === 'back') {
+                await sendWhatsAppMessage(phone, 'Please enter your full name:\n\nType *Back* to go back.');
+                nextState = 'patient_name';
+              } else if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
                 await createAppointment(db, {
                   phone,
                   patient_name:      collectedData.patient_name,

@@ -102,6 +102,14 @@ async function markSlotConfirmed(db, slotId) {
   await db.collection('time_slots').doc(slotId).update({ status: 'confirmed' });
 }
 
+async function markSlotAvailable(db, slotId) {
+  await db.collection('time_slots').doc(slotId).update({
+    status:          'available',
+    booked_by_phone: null,
+    booked_at:       null,
+  });
+}
+
 async function getServices(db) {
   const snap = await db.collection('services').orderBy('name', 'asc').get();
   return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -130,6 +138,7 @@ module.exports = {
   getBookedSlots,
   markSlotPending,
   markSlotConfirmed,
+  markSlotAvailable,
   getServices,
   getMedicalAids,
   getNextSevenDays,

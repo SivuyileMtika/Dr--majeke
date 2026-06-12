@@ -1,5 +1,5 @@
 const admin  = require('firebase-admin');
-const { markSlotConfirmed } = require('../utils/fireStoreHelpers');
+const { markSlotConfirmed, markSlotAvailable } = require('../utils/fireStoreHelpers');
 const { sendWhatsAppMessage } = require('../utils/whatsappButtons');
 
 function toE164(phone) {
@@ -35,12 +35,13 @@ async function confirmAppointmentHandler(db, req, res) {
       approved_at: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    if (confirm) {
-      const slots = await db.collection('time_slots')
-        .where('date', '==', apt.date)
-        .where('time', '==', apt.time)
-        .limit(1).get();
-      if (!slots.empty) await markSlotConfirmed(db, slots.docs[0].id);
+    const slots = await db.collection('time_slots')
+      .where('date', '==', apt.date)
+      .where('time', '==', apt.time)
+      .limit(1).get();
+    if (!slots.empty) {
+      if (confirm) await markSlotConfirmed(db, slots.docs[0].id);
+      else          await markSlotAvailable(db, slots.docs[0].id);
     }
 
     const date        = new Date(`${apt.date}T${apt.time}`);

@@ -234,6 +234,8 @@ async function processFlowCompletion(phone, nfmReply) {
   );
 }
 
+const processedMsgIds = new Set();
+
 async function processWebhook(body) {
   if (body.object !== 'whatsapp_business_account') return;
 
@@ -244,6 +246,17 @@ async function processWebhook(body) {
       const messages = change.value?.messages || [];
 
       for (const msg of messages) {
+        if (msg.id) {
+          if (processedMsgIds.has(msg.id)) {
+            console.log(`Duplicate webhook ignored: ${msg.id}`);
+            continue;
+          }
+          processedMsgIds.add(msg.id);
+          if (processedMsgIds.size > 500) {
+            processedMsgIds.delete(processedMsgIds.values().next().value);
+          }
+        }
+
         const phoneRaw = msg.from; // '27762677268' — no +
         const phone    = `+${phoneRaw}`;
         let text = '';

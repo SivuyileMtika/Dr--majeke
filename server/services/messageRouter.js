@@ -80,6 +80,11 @@ async function handleDateSelection(db, phone, selectedDate, conversationData) {
 
   let dateIndex = -1;
   const num = parseInt(s, 10);
+  // Text fallback: Back is at position dates.length + 1
+  if (!isNaN(num) && num === dates.length + 1) {
+    await sendMainMenu(phone);
+    return 'menu';
+  }
   if (!isNaN(num) && num >= 1 && num <= dates.length) {
     dateIndex = num - 1;
   } else {
@@ -130,6 +135,12 @@ async function handleTimeSelection(db, phone, selectedTime, conversationData) {
   const s = selectedTime.trim();
 
   const num = parseInt(s, 10);
+  // Text fallback: Back is at position slots.length + 1
+  if (!isNaN(num) && num === slots.length + 1) {
+    const dates = await getAvailableDates(db);
+    await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
+    return 'selecting_date';
+  }
   const slot = (!isNaN(num) && num >= 1 && num <= slots.length)
     ? slots[num - 1]
     : slots.find(sl => sl.time === s);
@@ -190,13 +201,23 @@ async function handleMedicalAidSelection(db, phone, selectedAid, conversationDat
 
   const aids = await getMedicalAids(db);
   const s    = selectedAid.trim();
+  const num  = parseInt(s, 10);
+
+  // Text fallback order: [aid1..aidN, Other, Back] → Other=N+1, Back=N+2
+  if (!isNaN(num) && num === aids.length + 2) {
+    await sendPaymentMenu(phone);
+    return 'payment_method';
+  }
+  if (!isNaN(num) && num === aids.length + 1) {
+    await sendWhatsAppMessage(phone, 'Please type the name of your medical aid:\n\nType *Back* to go back.');
+    return 'medical_aid_custom';
+  }
 
   if (s.toLowerCase() === 'other') {
     await sendWhatsAppMessage(phone, 'Please type the name of your medical aid:\n\nType *Back* to go back.');
     return 'medical_aid_custom';
   }
 
-  const num = parseInt(s, 10);
   const aid = (!isNaN(num) && num >= 1 && num <= aids.length)
     ? aids[num - 1]
     : aids.find(a => a.name.toLowerCase() === s.toLowerCase());

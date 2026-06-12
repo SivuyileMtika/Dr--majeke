@@ -94,4 +94,44 @@ async function sendWhatsAppButtons(phone, prompt, buttons) {
   }
 }
 
-module.exports = { sendWhatsAppMessage, sendWhatsAppButtons };
+function fmtDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+}
+
+async function sendFlowMessage(phone, flowId, availableDates) {
+  const to = normalizePhone(phone);
+  console.log(`Sending flow to ${to}`);
+  const data = await callApi({
+    messaging_product: 'whatsapp',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'flow',
+      header: { type: 'text', text: 'Book Appointment' },
+      body:   { text: 'Fill in your details to book an appointment with Dr. SG Majeke.' },
+      footer: { text: 'Dr Majeke GP Practice' },
+      action: {
+        name: 'flow',
+        parameters: {
+          flow_message_version: '3',
+          flow_token:  `${to}_${Date.now()}`,
+          flow_id:     flowId,
+          flow_cta:    'Book Now',
+          flow_action: 'navigate',
+          flow_action_payload: {
+            screen: 'DATE_SCREEN',
+            data: {
+              available_dates: availableDates.map(d => ({ id: d, title: fmtDate(d) })),
+            },
+          },
+        },
+      },
+    },
+  });
+  console.log(`Flow sent OK: ${data.messages?.[0]?.id}`);
+  return data;
+}
+
+module.exports = { sendWhatsAppMessage, sendWhatsAppButtons, sendFlowMessage };

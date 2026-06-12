@@ -1,4 +1,4 @@
-const { sendWhatsAppMessage, sendWhatsAppButtons } = require('../utils/whatsappButtons');
+const { sendWhatsAppMessage, sendWhatsAppButtons, sendFlowMessage } = require('../utils/whatsappButtons');
 const { getServices, getMedicalAids, getAvailableDates, getAvailableSlots } = require('../utils/fireStoreHelpers');
 
 function fmtDateLabel(dateStr) {
@@ -41,6 +41,16 @@ async function handleMenuSelection(db, phone, selection) {
       await sendWhatsAppMessage(phone, 'No available appointment dates at the moment. Please call us on 089 255 0069.');
       return 'menu';
     }
+    const flowId = process.env.FLOW_ID;
+    if (flowId) {
+      try {
+        await sendFlowMessage(phone, flowId, dates);
+        return 'awaiting_flow';
+      } catch (err) {
+        console.warn('Flow send failed, falling back to step-by-step:', err.message);
+      }
+    }
+    // Step-by-step fallback
     await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
@@ -257,6 +267,20 @@ async function handlePatientName(db, phone, name, conversationData) {
   return 'confirm_details';
 }
 
+async function handleAwaitingFlow(db, phone) {
+  const flowId = process.env.FLOW_ID;
+  if (flowId) {
+    const dates = await getAvailableDates(db);
+    if (dates.length > 0) {
+      await sendWhatsAppMessage(phone, 'Please use the booking form below:');
+      await sendFlowMessage(phone, flowId, dates);
+      return 'awaiting_flow';
+    }
+  }
+  await sendMainMenu(phone);
+  return 'menu';
+}
+
 module.exports = {
   handleInitialMessage,
   handleMenuSelection,
@@ -267,4 +291,5 @@ module.exports = {
   handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
+  handleAwaitingFlow,
 };

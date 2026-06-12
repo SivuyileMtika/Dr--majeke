@@ -1,0 +1,186 @@
+{
+  "version": "6.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "DATE_SCREEN": ["TIME_SCREEN"],
+    "TIME_SCREEN": ["DETAILS_SCREEN"],
+    "DETAILS_SCREEN": []
+  },
+  "screens": [
+    {
+      "id": "DATE_SCREEN",
+      "title": "Select Date",
+      "data": {
+        "available_dates": {
+          "type": "array",
+          "__example__": [
+            {"id": "2026-06-16", "title": "Mon, 16 Jun"}
+          ]
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "date_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "label": "Choose a date",
+                "name": "selected_date",
+                "required": true,
+                "data-source": "${data.available_dates}"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "selected_date": "${form.selected_date}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TIME_SCREEN",
+      "title": "Select Time",
+      "data": {
+        "available_times": {
+          "type": "array",
+          "__example__": [
+            {"id": "08:00", "title": "08:00"}
+          ]
+        },
+        "selected_date": {
+          "type": "string",
+          "__example__": "2026-06-16"
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "time_form",
+            "children": [
+              {
+                "type": "Dropdown",
+                "label": "Choose a time",
+                "name": "selected_time",
+                "required": true,
+                "data-source": "${data.available_times}"
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "selected_date": "${data.selected_date}",
+                    "selected_time": "${form.selected_time}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "DETAILS_SCREEN",
+      "title": "Your Details",
+      "data": {
+        "selected_date": {
+          "type": "string",
+          "__example__": "2026-06-16"
+        },
+        "selected_time": {
+          "type": "string",
+          "__example__": "08:00"
+        },
+        "medical_aids": {
+          "type": "array",
+          "__example__": [
+            {"id": "Discovery", "title": "Discovery"},
+            {"id": "Medihelp",  "title": "Medihelp"},
+            {"id": "Other",     "title": "Other"}
+          ]
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "details_form",
+            "children": [
+              {
+                "type": "TextInput",
+                "label": "Full Name",
+                "name": "patient_name",
+                "required": true,
+                "input-type": "text"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "label": "Payment Method",
+                "name": "payment_method",
+                "required": true,
+                "data-source": [
+                  {"id": "cash",        "title": "Cash"},
+                  {"id": "medical_aid", "title": "Medical Aid"}
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "label": "Medical Aid",
+                "name": "medical_aid_name",
+                "required": false,
+                "visible": "${form.payment_method == 'medical_aid'}",
+                "data-source": "${data.medical_aids}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Other Medical Aid Name",
+                "name": "medical_aid_other",
+                "required": false,
+                "input-type": "text",
+                "visible": "${form.payment_method == 'medical_aid' && form.medical_aid_name == 'Other'}"
+              },
+              {
+                "type": "TextInput",
+                "label": "Membership Number",
+                "name": "membership_number",
+                "required": false,
+                "input-type": "text",
+                "visible": "${form.payment_method == 'medical_aid'}"
+              },
+              {
+                "type": "Footer",
+                "label": "Confirm Booking",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "selected_date":     "${data.selected_date}",
+                    "selected_time":     "${data.selected_time}",
+                    "patient_name":      "${form.patient_name}",
+                    "payment_method":    "${form.payment_method}",
+                    "medical_aid_name":  "${form.medical_aid_name}",
+                    "medical_aid_other": "${form.medical_aid_other}",
+                    "membership_number": "${form.membership_number}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

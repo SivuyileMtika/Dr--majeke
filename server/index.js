@@ -11,6 +11,8 @@ const {
   markSlotPending,
   getServices,
   getMedicalAids,
+  getAvailableSlots,
+  getAvailableDates,
   getBookedSlots,
 } = require('./utils/fireStoreHelpers');
 const {
@@ -23,11 +25,13 @@ const {
   handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
+  handleAwaitingFlow,
 } = require('./services/messageRouter');
 const { seedMedicalAids, seedServices, seedTimeSlots } = require('./utils/seeding');
 const { authMiddleware }            = require('./middleware/auth');
 const { confirmAppointmentHandler } = require('./controllers/appointmentController');
-const { sendWhatsAppMessage }       = require('./utils/whatsappButtons');
+const { sendWhatsAppMessage, sendFlowMessage } = require('./utils/whatsappButtons');
+const { decryptRequest, encryptResponse }     = require('./utils/flowCrypto');
 
 dotenv.config();
 
@@ -104,6 +108,132 @@ app.post('/webhook', (req, res) => {
   processWebhook(req.body).catch(err => console.error('Webhook processing error:', err));
 });
 
+function fmtDate(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+}
+
+// WhatsApp Flow endpoint — handles dynamic data for each screen
+app.post('/flow-endpoint', async (req, res) => {
+  const privateKey = process.env.FLOW_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  if (!privateKey) {
+    console.error('FLOW_PRIVATE_KEY not set');
+    return res.status(500).send('Flow key not configured');
+  }
+  try {
+    const { decryptedBody, aesKey, iv } = decryptRequest(req.body, privateKey);
+    console.log('Flow request action:', decryptedBody.action, 'screen:', decryptedBody.screen);
+    const response  = await handleFlowRequest(decryptedBody);
+    const encrypted = encryptResponse(response, aesKey, iv);
+    res.type('text/plain').send(encrypted);
+  } catch (err) {
+    console.error('Flow endpoint error:', err.message);
+    res.status(500).send('Error');
+  }
+});
+
+async function handleFlowRequest({ action, screen, data }) {
+  if (action === 'ping') {
+    return { data: { status: 'active' } };
+  }
+
+  if (action === 'INIT' || (action === 'data_exchange' && screen === 'DATE_SCREEN' && !data?.selected_date)) {
+    const dates = await getAvailableDates(db);
+    return {
+      screen: 'DATE_SCREEN',
+      data: { available_dates: dates.map(d => ({ id: d, title: fmtDate(d) })) },
+    };
+  }
+
+  if (action === 'data_exchange') {
+    if (screen === 'DATE_SCREEN') {
+      const slots = await getAvailableSlots(db, data.selected_date);
+      if (slots.length === 0) {
+        const dates = await getAvailableDates(db);
+        return {
+          screen: 'DATE_SCREEN',
+          data: { available_dates: dates.map(d => ({ id: d, title: fmtDate(d) })) },
+        };
+      }
+      return {
+        screen: 'TIME_SCREEN',
+        data: {
+          selected_date:   data.selected_date,
+          available_times: slots.map(s => ({ id: s.time, title: s.time })),
+        },
+      };
+    }
+
+    if (screen === 'TIME_SCREEN') {
+      const aids = await getMedicalAids(db);
+      return {
+        screen: 'DETAILS_SCREEN',
+        data: {
+          selected_date:  data.selected_date,
+          selected_time:  data.selected_time,
+          medical_aids:   [...aids.map(a => ({ id: a.name, title: a.name })), { id: 'Other', title: 'Other' }],
+        },
+      };
+    }
+  }
+
+  return { data: { status: 'ok' } };
+}
+
+async function processFlowCompletion(phone, nfmReply) {
+  const formData = JSON.parse(nfmReply.response_json);
+  const {
+    selected_date,
+    selected_time,
+    patient_name,
+    payment_method,
+    medical_aid_name,
+    medical_aid_other,
+    membership_number,
+  } = formData;
+
+  const medicalAid = payment_method === 'medical_aid'
+    ? (medical_aid_name === 'Other' ? medical_aid_other : medical_aid_name)
+    : null;
+
+  console.log(`Flow booking: ${phone} → ${selected_date} ${selected_time} for ${patient_name}`);
+
+  const slotSnap = await db.collection('time_slots')
+    .where('date', '==', selected_date)
+    .where('time', '==', selected_time)
+    .where('status', '==', 'available')
+    .limit(1).get();
+
+  if (slotSnap.empty) {
+    await sendWhatsAppMessage(phone, `Sorry, the ${selected_time} slot on ${fmtDate(selected_date)} is no longer available. Please choose another time.`);
+    const dates = await getAvailableDates(db);
+    if (dates.length > 0 && process.env.FLOW_ID) {
+      await sendFlowMessage(phone, process.env.FLOW_ID, dates);
+    }
+    return;
+  }
+
+  await markSlotPending(db, slotSnap.docs[0].id, phone);
+  await createAppointment(db, {
+    phone,
+    patient_name:      patient_name.trim(),
+    date:              selected_date,
+    time:              selected_time,
+    payment_method,
+    medical_aid:       medicalAid || null,
+    membership_number: membership_number || null,
+  });
+  await updateConversationState(db, phone, 'complete', {});
+
+  const dateDisplay = new Date(selected_date + 'T00:00:00').toLocaleDateString('en-ZA', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+  await sendWhatsAppMessage(phone,
+    `Thank you ${patient_name.trim()}! Your booking request for ${dateDisplay} at ${selected_time} is pending doctor approval. You will receive confirmation within 24 hours.`
+  );
+}
+
 async function processWebhook(body) {
   if (body.object !== 'whatsapp_business_account') return;
 
@@ -121,7 +251,15 @@ async function processWebhook(body) {
         if (msg.type === 'text') {
           text = (msg.text?.body || '').trim();
         } else if (msg.type === 'interactive') {
-          if (msg.interactive?.type === 'button_reply') {
+          if (msg.interactive?.type === 'nfm_reply') {
+            try {
+              await processFlowCompletion(phone, msg.interactive.nfm_reply);
+            } catch (err) {
+              console.error('Flow completion error:', err.message);
+              await sendWhatsAppMessage(phone, 'An error occurred. Please try again or send "Hi" to restart.');
+            }
+            continue;
+          } else if (msg.interactive?.type === 'button_reply') {
             text = msg.interactive.button_reply.title;
           } else if (msg.interactive?.type === 'list_reply') {
             text = msg.interactive.list_reply.title;
@@ -142,7 +280,8 @@ async function processWebhook(body) {
           try {
             if (nextState === 'complete') nextState = 'initial';
 
-            if      (nextState === 'initial')            nextState = await handleInitialMessage(db, phone, text);
+            if      (nextState === 'awaiting_flow')       nextState = await handleAwaitingFlow(db, phone);
+            else if (nextState === 'initial')            nextState = await handleInitialMessage(db, phone, text);
             else if (nextState === 'menu')               nextState = await handleMenuSelection(db, phone, text);
             else if (nextState === 'selecting_date')     nextState = await handleDateSelection(db, phone, text, collectedData);
             else if (nextState === 'selecting_time')     nextState = await handleTimeSelection(db, phone, text, collectedData);

@@ -25,7 +25,7 @@ async function updateConversationState(db, phone, state, collectedData = null) {
   await db.collection('patient_conversations').doc(phone).update(updates);
 }
 
-async function createAppointment(db, { phone, patient_name, date, time, payment_method, medical_aid, membership_number, service_id }) {
+async function createAppointment(db, { phone, patient_name, date, time, payment_method, medical_aid, medical_plan, membership_number, id_number, reason_for_visit, service_id }) {
   const ref = await db.collection('appointments').add({
     phone,
     patient_name,
@@ -34,7 +34,10 @@ async function createAppointment(db, { phone, patient_name, date, time, payment_
     status:            'pending_approval',
     payment_method,
     medical_aid:       medical_aid || null,
+    medical_plan:      medical_plan || null,
     membership_number: membership_number || null,
+    id_number:         id_number || null,
+    reason_for_visit:  reason_for_visit || null,
     service_id:        service_id || null,
     created_at:        admin.firestore.FieldValue.serverTimestamp(),
     approved_by:       null,

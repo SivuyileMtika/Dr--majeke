@@ -22,9 +22,13 @@ const {
   handleTimeSelection,
   handlePaymentMethod,
   handleMedicalAidSelection,
+  handleMedicalAidPlan,
+  handleMedicalAidPlanCustom,
   handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
+  handleIdNumber,
+  handleReasonForVisit,
   handleAwaitingFlow,
 } = require('./services/messageRouter');
 const { seedMedicalAids, seedServices, seedTimeSlots } = require('./utils/seeding');
@@ -293,16 +297,20 @@ async function processWebhook(body) {
           try {
             if (nextState === 'complete') nextState = 'initial';
 
-            if      (nextState === 'awaiting_flow')       nextState = await handleAwaitingFlow(db, phone);
-            else if (nextState === 'initial')            nextState = await handleInitialMessage(db, phone, text);
-            else if (nextState === 'menu')               nextState = await handleMenuSelection(db, phone, text);
-            else if (nextState === 'selecting_date')     nextState = await handleDateSelection(db, phone, text, collectedData);
-            else if (nextState === 'selecting_time')     nextState = await handleTimeSelection(db, phone, text, collectedData);
-            else if (nextState === 'payment_method')     nextState = await handlePaymentMethod(db, phone, text, collectedData);
-            else if (nextState === 'medical_aid_select') nextState = await handleMedicalAidSelection(db, phone, text, collectedData);
-            else if (nextState === 'medical_aid_custom') nextState = await handleMedicalAidCustom(db, phone, text, collectedData);
-            else if (nextState === 'membership_number')  nextState = await handleMembershipNumber(db, phone, text, collectedData);
-            else if (nextState === 'patient_name')       nextState = await handlePatientName(db, phone, text, collectedData);
+            if      (nextState === 'awaiting_flow')         nextState = await handleAwaitingFlow(db, phone);
+            else if (nextState === 'initial')              nextState = await handleInitialMessage(db, phone, text);
+            else if (nextState === 'menu')                 nextState = await handleMenuSelection(db, phone, text);
+            else if (nextState === 'selecting_date')       nextState = await handleDateSelection(db, phone, text, collectedData);
+            else if (nextState === 'selecting_time')       nextState = await handleTimeSelection(db, phone, text, collectedData);
+            else if (nextState === 'payment_method')       nextState = await handlePaymentMethod(db, phone, text, collectedData);
+            else if (nextState === 'medical_aid_select')   nextState = await handleMedicalAidSelection(db, phone, text, collectedData);
+            else if (nextState === 'medical_aid_plan')     nextState = await handleMedicalAidPlan(db, phone, text, collectedData);
+            else if (nextState === 'medical_aid_plan_custom') nextState = await handleMedicalAidPlanCustom(db, phone, text, collectedData);
+            else if (nextState === 'medical_aid_custom')   nextState = await handleMedicalAidCustom(db, phone, text, collectedData);
+            else if (nextState === 'membership_number')    nextState = await handleMembershipNumber(db, phone, text, collectedData);
+            else if (nextState === 'patient_name')         nextState = await handlePatientName(db, phone, text, collectedData);
+            else if (nextState === 'id_number')            nextState = await handleIdNumber(db, phone, text, collectedData);
+            else if (nextState === 'reason_for_visit')     nextState = await handleReasonForVisit(db, phone, text, collectedData);
             else if (nextState === 'confirm_details') {
               const t = text.toLowerCase();
               if (t === 'back') {
@@ -316,7 +324,10 @@ async function processWebhook(body) {
                   time:              collectedData.selected_time,
                   payment_method:    collectedData.payment_method,
                   medical_aid:       collectedData.medical_aid || null,
+                  medical_plan:      collectedData.medical_plan || null,
                   membership_number: collectedData.membership_number || null,
+                  id_number:         collectedData.id_number || null,
+                  reason_for_visit:  collectedData.reason_for_visit || null,
                 });
                 await markSlotPending(db, collectedData.selected_slot_id, phone);
                 await sendWhatsAppMessage(phone,

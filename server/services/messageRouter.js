@@ -50,7 +50,6 @@ async function handleMenuSelection(db, phone, selection) {
         console.warn('Flow send failed, falling back to step-by-step:', err.message);
       }
     }
-    // Step-by-step fallback
     await sendWhatsAppButtons(phone, 'Select an appointment date:', [...dates.map(fmtDateLabel), 'Back']);
     return 'selecting_date';
   }
@@ -226,8 +225,79 @@ async function handleMedicalAidSelection(db, phone, selectedAid, conversationDat
     await sendWhatsAppButtons(phone, 'Please select your medical aid from the list:', [...aids.map(a => a.name), 'Other', 'Back']);
     return 'medical_aid_select';
   }
+
   conversationData.medical_aid = aid.name;
+  const plans = aid.plans || [];
+  if (plans.length > 0) {
+    await sendWhatsAppButtons(phone, `Select your ${aid.name} plan:`, [...plans, 'Other', 'Back']);
+    return 'medical_aid_plan';
+  }
   await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
+  return 'membership_number';
+}
+
+async function handleMedicalAidPlan(db, phone, text, conversationData) {
+  if (isBack(text)) {
+    await sendMedicalAidList(db, phone);
+    return 'medical_aid_select';
+  }
+
+  const aids = await getMedicalAids(db);
+  const selectedAid = aids.find(a => a.name === conversationData.medical_aid);
+  const plans = selectedAid?.plans || [];
+  const s = text.trim();
+  const num = parseInt(s, 10);
+
+  // Numeric Back and Other from text fallback: [plan1..planN, Other, Back]
+  if (!isNaN(num) && num === plans.length + 2) {
+    await sendMedicalAidList(db, phone);
+    return 'medical_aid_select';
+  }
+  if (!isNaN(num) && num === plans.length + 1) {
+    await sendWhatsAppMessage(phone, 'Please type your plan name:\n\nType *Back* to go back.');
+    return 'medical_aid_plan_custom';
+  }
+
+  if (s.toLowerCase() === 'other') {
+    await sendWhatsAppMessage(phone, 'Please type your plan name:\n\nType *Back* to go back.');
+    return 'medical_aid_plan_custom';
+  }
+
+  const plan = (!isNaN(num) && num >= 1 && num <= plans.length)
+    ? plans[num - 1]
+    : plans.find(p => p.toLowerCase() === s.toLowerCase());
+
+  if (plan) {
+    conversationData.medical_plan = plan;
+    await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change plan.');
+    return 'membership_number';
+  }
+
+  // If text doesn't match any plan and isn't a number, accept as custom plan
+  if (isNaN(num) && s.length >= 2) {
+    conversationData.medical_plan = s;
+    await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change plan.');
+    return 'membership_number';
+  }
+
+  await sendWhatsAppButtons(phone, `Select your ${conversationData.medical_aid} plan:`, [...plans, 'Other', 'Back']);
+  return 'medical_aid_plan';
+}
+
+async function handleMedicalAidPlanCustom(db, phone, text, conversationData) {
+  if (isBack(text)) {
+    const aids = await getMedicalAids(db);
+    const selectedAid = aids.find(a => a.name === conversationData.medical_aid);
+    const plans = selectedAid?.plans || [];
+    await sendWhatsAppButtons(phone, `Select your ${conversationData.medical_aid} plan:`, [...plans, 'Other', 'Back']);
+    return 'medical_aid_plan';
+  }
+  if (!text || text.trim().length < 2) {
+    await sendWhatsAppMessage(phone, 'Please type your plan name:\n\nType *Back* to go back.');
+    return 'medical_aid_plan_custom';
+  }
+  conversationData.medical_plan = text.trim();
+  await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change plan.');
   return 'membership_number';
 }
 
@@ -241,17 +311,24 @@ async function handleMedicalAidCustom(db, phone, text, conversationData) {
     return 'medical_aid_custom';
   }
   conversationData.medical_aid = text.trim();
-  await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
-  return 'membership_number';
+  await sendWhatsAppMessage(phone, 'Please type your plan name (or type *None* if not applicable):\n\nType *Back* to go back.');
+  return 'medical_aid_plan_custom';
 }
 
 async function handleMembershipNumber(db, phone, membershipNumber, conversationData) {
   if (isBack(membershipNumber)) {
+    const aids = await getMedicalAids(db);
+    const selectedAid = aids.find(a => a.name === conversationData.medical_aid);
+    const plans = selectedAid?.plans || [];
+    if (plans.length > 0) {
+      await sendWhatsAppButtons(phone, `Select your ${conversationData.medical_aid} plan:`, [...plans, 'Other', 'Back']);
+      return 'medical_aid_plan';
+    }
     await sendMedicalAidList(db, phone);
     return 'medical_aid_select';
   }
   if (!membershipNumber || membershipNumber.trim().length < 3) {
-    await sendWhatsAppMessage(phone, 'Please enter a valid membership number:\n\nType *Back* to change medical aid.');
+    await sendWhatsAppMessage(phone, 'Please enter a valid membership number:\n\nType *Back* to change plan.');
     return 'membership_number';
   }
   conversationData.membership_number = membershipNumber.trim();
@@ -262,7 +339,7 @@ async function handleMembershipNumber(db, phone, membershipNumber, conversationD
 async function handlePatientName(db, phone, name, conversationData) {
   if (isBack(name)) {
     if (conversationData.payment_method === 'medical_aid') {
-      await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change medical aid.');
+      await sendWhatsAppMessage(phone, 'Please enter your medical aid membership number:\n\nType *Back* to change plan.');
       return 'membership_number';
     }
     await sendPaymentMenu(phone);
@@ -273,14 +350,44 @@ async function handlePatientName(db, phone, name, conversationData) {
     return 'patient_name';
   }
   conversationData.patient_name = name.trim();
+  await sendWhatsAppMessage(phone, 'Please enter your South African ID number:\n\nType *Back* to re-enter your name.');
+  return 'id_number';
+}
+
+async function handleIdNumber(db, phone, text, conversationData) {
+  if (isBack(text)) {
+    await sendWhatsAppMessage(phone, 'Please enter your full name:\n\nType *Back* to go back.');
+    return 'patient_name';
+  }
+  if (!text || text.trim().length < 5) {
+    await sendWhatsAppMessage(phone, 'Please enter a valid ID number:\n\nType *Back* to go back.');
+    return 'id_number';
+  }
+  conversationData.id_number = text.trim();
+  await sendWhatsAppMessage(phone, 'Please describe your reason for visit:\n\nType *Back* to re-enter ID number.');
+  return 'reason_for_visit';
+}
+
+async function handleReasonForVisit(db, phone, text, conversationData) {
+  if (isBack(text)) {
+    await sendWhatsAppMessage(phone, 'Please enter your South African ID number:\n\nType *Back* to re-enter your name.');
+    return 'id_number';
+  }
+  if (!text || text.trim().length < 2) {
+    await sendWhatsAppMessage(phone, 'Please describe your reason for visit:\n\nType *Back* to go back.');
+    return 'reason_for_visit';
+  }
+  conversationData.reason_for_visit = text.trim();
 
   const summary =
     `Booking Summary:\n\n` +
-    `Date:    ${fmtDateLabel(conversationData.selected_date)}\n` +
-    `Time:    ${conversationData.selected_time}\n` +
-    `Name:    ${conversationData.patient_name}\n` +
-    `Payment: ${conversationData.payment_method === 'medical_aid'
-      ? `${conversationData.medical_aid} (#${conversationData.membership_number})`
+    `📅 Date:    ${fmtDateLabel(conversationData.selected_date)}\n` +
+    `🕐 Time:    ${conversationData.selected_time}\n` +
+    `👤 Name:    ${conversationData.patient_name}\n` +
+    `🪪 ID:      ${conversationData.id_number}\n` +
+    `💬 Reason:  ${conversationData.reason_for_visit}\n` +
+    `💳 Payment: ${conversationData.payment_method === 'medical_aid'
+      ? `${conversationData.medical_aid}${conversationData.medical_plan ? ` — ${conversationData.medical_plan}` : ''} (#${conversationData.membership_number})`
       : 'Cash'}`;
 
   await sendWhatsAppMessage(phone, summary);
@@ -309,8 +416,12 @@ module.exports = {
   handleTimeSelection,
   handlePaymentMethod,
   handleMedicalAidSelection,
+  handleMedicalAidPlan,
+  handleMedicalAidPlanCustom,
   handleMedicalAidCustom,
   handleMembershipNumber,
   handlePatientName,
+  handleIdNumber,
+  handleReasonForVisit,
   handleAwaitingFlow,
 };

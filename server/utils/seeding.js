@@ -1,14 +1,14 @@
 const admin = require('firebase-admin');
 
 const DEFAULT_MEDICAL_AIDS = [
-  { name: 'Discovery Health', code: 'DISCOVERY', contact: '+27124001000' },
-  { name: 'Medshield', code: 'MEDSHIELD', contact: '+27105222222' },
-  { name: 'Bonitas', code: 'BONITAS', contact: '+27119020000' },
-  { name: 'MOMENTUM Health', code: 'MOMENTUM', contact: '+27829800800' },
-  { name: 'Fedhealth', code: 'FEDHEALTH', contact: '+27110240000' },
-  { name: 'Ampath Health', code: 'AMPATH', contact: '+27315017000' },
-  { name: 'Sizwe Medical Fund', code: 'SIZWE', contact: '+27119880000' },
-  { name: 'GEMS', code: 'GEMS', contact: '+27861666846' },
+  { name: 'Discovery Health', code: 'DISCOVERY', contact: '+27124001000', plans: ['KeyCare Core', 'KeyCare Plus', 'Essential', 'Classic', 'Comprehensive', 'Executive'] },
+  { name: 'Medshield', code: 'MEDSHIELD', contact: '+27105222222', plans: ['MediValue', 'MediBonus', 'MediCore', 'MediElite'] },
+  { name: 'Bonitas', code: 'BONITAS', contact: '+27119020000', plans: ['BonEssential', 'BonCap', 'Primary', 'Standard', 'Select'] },
+  { name: 'MOMENTUM Health', code: 'MOMENTUM', contact: '+27829800800', plans: ['Ingwe', 'Evolve', 'Myriad', 'Summit', 'Custom'] },
+  { name: 'Fedhealth', code: 'FEDHEALTH', contact: '+27110240000', plans: ['Flexifed 1', 'Flexifed 2', 'Maxima Entrant', 'Maxima Traditional', 'Maxima Exec'] },
+  { name: 'Ampath Health', code: 'AMPATH', contact: '+27315017000', plans: ['Standard', 'Plus', 'Comprehensive'] },
+  { name: 'Sizwe Medical Fund', code: 'SIZWE', contact: '+27119880000', plans: ['Navigator', 'Khula', 'Physio Plus', 'Hospital Plan'] },
+  { name: 'GEMS', code: 'GEMS', contact: '+27861666846', plans: ['Emerald', 'Ruby', 'Diamond', 'Sapphire'] },
 ];
 
 const DEFAULT_SERVICES = [
@@ -23,6 +23,9 @@ async function seedMedicalAids(db) {
     if (snap.empty) {
       await db.collection('medical_aids').add(aid);
       console.log(`Added medical aid: ${aid.name}`);
+    } else if (!snap.docs[0].data().plans) {
+      await snap.docs[0].ref.update({ plans: aid.plans });
+      console.log(`Updated plans for: ${aid.name}`);
     }
   }
 }

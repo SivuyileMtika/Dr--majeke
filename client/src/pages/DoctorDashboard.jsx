@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import axios from 'axios';
@@ -18,69 +18,91 @@ const fmtTs = ts => {
   if (!ts) return '—';
   try {
     const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
-    return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })
-      + ' ' + d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
   } catch { return '—'; }
 };
 
 const statusMap = {
-  pending_approval: { label: 'Pending',   bg: '#fffbeb', color: '#d97706', border: '#fcd34d' },
-  confirmed:        { label: 'Confirmed', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
-  rejected:         { label: 'Rejected',  bg: '#fef2f2', color: '#dc2626', border: '#fca5a5' },
+  pending_approval: { label: 'Pending',   bg: 'linear-gradient(135deg,#fffbeb,#fef3c7)', color: '#92400e', border: '#fcd34d', dot: '#f59e0b' },
+  confirmed:        { label: 'Confirmed', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', color: '#14532d', border: '#86efac', dot: '#22c55e' },
+  rejected:         { label: 'Rejected',  bg: 'linear-gradient(135deg,#fef2f2,#fee2e2)', color: '#7f1d1d', border: '#fca5a5', dot: '#ef4444' },
 };
 
 const StatusBadge = ({ status }) => {
-  const s = statusMap[status] || { label: status, bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0' };
-  return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{s.label}</span>;
+  const s = statusMap[status] || { label: status, bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0', dot: '#94a3b8' };
+  return (
+    <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+      {s.label}
+    </span>
+  );
 };
 
 const SourceBadge = ({ source }) => (
   source === 'website'
-    ? <span style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>Web</span>
-    : <span style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>WA</span>
+    ? <span style={{ background: 'linear-gradient(135deg,#eff6ff,#dbeafe)', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>🌐 Web</span>
+    : <span style={{ background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', color: '#15803d', border: '1px solid #86efac', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 700 }}>💬 WhatsApp</span>
 );
 
-const Avatar = ({ name, size = 34 }) => {
+const Avatar = ({ name, size = 36 }) => {
   const initials = (name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const hue = (name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: `hsl(${hue},40%,55%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.35, flexShrink: 0 }}>
+    <div style={{ width: size, height: size, borderRadius: '50%', background: `linear-gradient(135deg, hsl(${hue},55%,50%), hsl(${(hue+40)%360},55%,40%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: size * 0.35, flexShrink: 0, boxShadow: `0 2px 8px hsl(${hue},40%,50%,0.35)` }}>
       {initials}
     </div>
   );
 };
 
-const AptCard = ({ apt, actionLoading, actionError, onApprove, onReject, onOpen }) => (
-  <div
-    onClick={onOpen}
-    style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '12px 14px', borderLeft: `3px solid ${apt.status === 'confirmed' ? '#16a34a' : apt.status === 'rejected' ? '#dc2626' : '#d97706'}`, cursor: 'pointer' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-      <Avatar name={apt.patient_name} size={32} />
+const StatCard = ({ icon, label, value, color, bg }) => (
+  <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 1px 4px rgba(15,23,42,0.06)', border: '1px solid #f1f5f9', flex: 1, minWidth: 0 }}>
+    <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{icon}</div>
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500, marginTop: 2, whiteSpace: 'nowrap' }}>{label}</div>
+    </div>
+  </div>
+);
+
+const Toast = ({ toasts }) => (
+  <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 999, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
+    {toasts.map(t => (
+      <div key={t.id} style={{ background: t.type === 'success' ? '#16a34a' : '#dc2626', color: '#fff', borderRadius: 10, padding: '10px 16px', fontSize: 13, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideIn .25s ease', whiteSpace: 'nowrap' }}>
+        {t.type === 'success' ? '✓' : '✕'} {t.message}
+      </div>
+    ))}
+  </div>
+);
+
+const AptCard = ({ apt, actionLoading, onApprove, onReject, onOpen }) => (
+  <div onClick={onOpen} style={{ background: '#fff', borderRadius: 14, border: '1px solid #f1f5f9', padding: '14px 16px', borderLeft: `4px solid ${apt.status === 'confirmed' ? '#22c55e' : apt.status === 'rejected' ? '#ef4444' : '#f59e0b'}`, cursor: 'pointer', boxShadow: '0 1px 4px rgba(15,23,42,0.05)', transition: 'box-shadow .2s, transform .2s' }}
+    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(15,23,42,0.1)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(15,23,42,0.05)'; e.currentTarget.style.transform = 'none'; }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      <Avatar name={apt.patient_name} size={34} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
-        <div style={{ fontSize: 11, color: '#94a3b8' }}>{apt.phone}</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{apt.phone}</div>
       </div>
       <StatusBadge status={apt.status} />
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 12, color: '#475569' }}>{fmtDate(apt.date)}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>{apt.time}</span>
-      <span style={{ fontSize: 11, color: '#64748b' }}>{apt.payment_method === 'medical_aid' ? apt.medical_aid || 'Medical Aid' : 'Cash'}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: apt.status === 'pending_approval' ? 10 : 0 }}>
+      <span style={{ background: '#f8fafc', borderRadius: 6, padding: '3px 8px', fontSize: 12, color: '#475569', fontWeight: 500 }}>📅 {fmtDate(apt.date)}</span>
+      <span style={{ background: '#fff7ed', borderRadius: 6, padding: '3px 8px', fontSize: 12, fontWeight: 800, color: '#ea580c' }}>🕐 {apt.time}</span>
       <SourceBadge source={apt.source} />
     </div>
     {apt.status === 'pending_approval' && (
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }} onClick={e => e.stopPropagation()}>
+      <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
         <button type="button" disabled={actionLoading} onClick={onApprove}
-          style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1 }}>
-          {actionLoading ? '…' : 'Approve'}
+          style={{ flex: 1, background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 0', fontSize: 13, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1, transition: 'opacity .15s' }}>
+          {actionLoading ? '…' : '✓ Approve'}
         </button>
         <button type="button" disabled={actionLoading} onClick={onReject}
-          style={{ flex: 1, background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 6, padding: '8px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1 }}>
-          {actionLoading ? '…' : 'Reject'}
+          style={{ flex: 1, background: '#fff', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 8, padding: '9px 0', fontSize: 13, fontWeight: 700, cursor: actionLoading ? 'not-allowed' : 'pointer', opacity: actionLoading ? .5 : 1, transition: 'opacity .15s' }}>
+          {actionLoading ? '…' : '✕ Reject'}
         </button>
       </div>
     )}
-    {actionError && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 6 }}>{actionError}</p>}
   </div>
 );
 
@@ -94,12 +116,18 @@ export default function DoctorDashboard() {
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [actionLoading, setActionLoading] = useState({});
-  const [actionError, setActionError]     = useState({});
   const [autoPilot, setAutoPilot]         = useState(() => localStorage.getItem('autopilot') === 'true');
   const autoProcessedRef                  = useRef(new Set());
   const [sheetOpen, setSheetOpen]         = useState(false);
   const [detailApt, setDetailApt]         = useState(null);
   const [now, setNow]                     = useState(new Date());
+  const [toasts, setToasts]               = useState([]);
+
+  const addToast = useCallback((message, type = 'success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000);
@@ -110,8 +138,7 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     if (!autoPilot || appointments.length === 0) return;
-    const pend = appointments.filter(a => a.status === 'pending_approval');
-    pend.forEach((apt, idx) => {
+    appointments.filter(a => a.status === 'pending_approval').forEach((apt, idx) => {
       if (autoProcessedRef.current.has(apt.id)) return;
       autoProcessedRef.current.add(apt.id);
       setTimeout(() => {
@@ -133,14 +160,14 @@ export default function DoctorDashboard() {
 
   const handleAction = async (id, confirm) => {
     setActionLoading(s => ({ ...s, [id]: true }));
-    setActionError(s => ({ ...s, [id]: null }));
     try {
       await axios.post(`${API_BASE}/confirm-appointment`,
         { appointmentId: id, confirm, doctorName: 'Dr. SG Majeke' },
         { headers: { Authorization: `Bearer ${AUTH_TOKEN}`, 'Content-Type': 'application/json' } }
       );
+      addToast(confirm ? 'Appointment approved ✓' : 'Appointment rejected', confirm ? 'success' : 'error');
     } catch (e) {
-      setActionError(s => ({ ...s, [id]: e.response?.data?.error || e.message }));
+      addToast(e.response?.data?.error || 'Action failed', 'error');
     } finally {
       setActionLoading(s => ({ ...s, [id]: false }));
     }
@@ -153,6 +180,11 @@ export default function DoctorDashboard() {
   const filtered = appointments
     .filter(a => filterStatus === 'all' || a.status === filterStatus)
     .filter(a => !search || (a.patient_name || '').toLowerCase().includes(search.toLowerCase()) || (a.phone || '').includes(search));
+
+  const todayApts     = forDay(today);
+  const confirmedToday = todayApts.filter(a => a.status === 'confirmed').length;
+  const weekStart     = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  const thisWeekCount = appointments.filter(a => a.date >= weekStart.toISOString().split('T')[0] && a.date <= today).length;
 
   const buildCal = () => {
     const yr = month.getFullYear(), mo = month.getMonth();
@@ -175,45 +207,60 @@ export default function DoctorDashboard() {
   const monthStr = month.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
   const dayApts  = forDay(selectedDay);
 
+  const tabConfig = [
+    { key: 'calendar', label: 'Calendar',  icon: '📅' },
+    { key: 'bookings', label: 'Bookings',  icon: '📋' },
+    { key: 'pending',  label: `Pending${pending.length ? ` (${pending.length})` : ''}`, icon: '⏳', mobileLabel: 'Pending' },
+  ];
+
   const css = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; -webkit-text-size-adjust: 100%; }
-    body { background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; color: #334155; }
+    body { background: #f0f4f8; font-family: 'Inter', system-ui, sans-serif; color: #1e293b; }
 
     .dash { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
     /* Topbar */
     .topbar {
-      background: #fff; border-bottom: 1px solid #e2e8f0;
-      padding: 0 24px; height: 56px; flex-shrink: 0;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%);
+      padding: 0 24px; height: 60px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      box-shadow: 0 2px 20px rgba(30,58,138,0.4);
     }
-    .topbar-brand { display: flex; align-items: center; gap: 10px; }
-    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .topbar-brand { display: flex; align-items: center; gap: 12px; }
 
-    /* Desktop nav */
     .desktop-nav { display: flex; gap: 2px; }
-    .nav-btn { background: none; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; transition: background .15s, color .15s; white-space: nowrap; }
-    .nav-btn:hover  { background: #f1f5f9; color: #0f172a; }
-    .nav-btn.active { background: #fff7ed; color: #ea580c; font-weight: 600; }
+    .nav-btn {
+      background: rgba(255,255,255,0.1); border: none; padding: 7px 16px;
+      border-radius: 8px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.75);
+      cursor: pointer; transition: background .15s, color .15s; white-space: nowrap;
+    }
+    .nav-btn:hover  { background: rgba(255,255,255,0.2); color: #fff; }
+    .nav-btn.active { background: rgba(255,255,255,0.22); color: #fff; font-weight: 700; }
+
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
     /* Body */
     .body { display: flex; flex: 1; overflow: hidden; }
     .main { flex: 1; overflow-y: auto; padding: 20px 24px; -webkit-overflow-scrolling: touch; }
-    .sidebar { width: 280px; min-width: 280px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: #fff; overflow-y: auto; padding: 20px; }
+    .sidebar { width: 290px; min-width: 290px; flex-shrink: 0; border-left: 1px solid #e2e8f0; background: #fff; overflow-y: auto; padding: 20px; }
+
+    /* Stats */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; }
 
     /* Calendar */
+    .cal-wrap { background: #fff; borderRadius: 16px; border: 1px solid #f1f5f9; padding: 16px; box-shadow: 0 1px 4px rgba(15,23,42,0.06); border-radius: 16px; }
     .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
-    .cal-head { font-size: 10px; font-weight: 700; color: #94a3b8; text-align: center; padding: 5px 0; text-transform: uppercase; }
-    .cal-cell { border-radius: 6px; min-height: 64px; padding: 5px; cursor: pointer; border: 1px solid transparent; transition: border-color .1s, background .1s; }
-    .cal-cell:hover    { border-color: #e2e8f0; background: #f8fafc; }
-    .cal-cell.today    { background: #fff7ed; border-color: #fdba74; }
-    .cal-cell.selected { background: #fff7ed; border-color: #ea580c; }
-    .cal-num { font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
-    .cal-cell.today .cal-num    { color: #ea580c; font-weight: 700; }
-    .cal-cell.selected .cal-num { color: #ea580c; font-weight: 700; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+    .cal-head { font-size: 10px; font-weight: 800; color: #94a3b8; text-align: center; padding: 6px 0; text-transform: uppercase; letter-spacing: .5px; }
+    .cal-cell { border-radius: 10px; min-height: 68px; padding: 6px; cursor: pointer; border: 1.5px solid transparent; transition: all .15s; position: relative; }
+    .cal-cell:hover    { border-color: #c7d2fe; background: #f5f7ff; }
+    .cal-cell.today    { background: linear-gradient(135deg,#fff7ed,#ffedd5); border-color: #fdba74; }
+    .cal-cell.selected { background: linear-gradient(135deg,#eff6ff,#dbeafe); border-color: #3b82f6; }
+    .cal-num { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+    .cal-cell.today .cal-num    { color: #ea580c; font-weight: 800; }
+    .cal-cell.selected .cal-num { color: #1d4ed8; font-weight: 800; }
     .cal-dots { display: flex; flex-wrap: wrap; gap: 2px; }
     .dot { width: 5px; height: 5px; border-radius: 50%; }
 
@@ -221,90 +268,94 @@ export default function DoctorDashboard() {
     .card-list { display: flex; flex-direction: column; gap: 10px; }
 
     /* Pending grid */
-    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 
     /* Filters */
-    .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
-    .search-input { flex: 1; min-width: 140px; max-width: 260px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 12px; font-size: 13px; color: #334155; }
-    .search-input:focus { outline: 2px solid #ea580c; outline-offset: 1px; }
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+    .search-input { flex: 1; min-width: 140px; max-width: 280px; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 9px 14px; font-size: 13px; color: #1e293b; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
+    .search-input:focus { outline: 2px solid #3b82f6; outline-offset: 1px; border-color: transparent; }
     .pill-row { display: flex; gap: 5px; flex-wrap: wrap; }
-    .pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #64748b; cursor: pointer; white-space: nowrap; }
-    .pill.on { background: #ea580c; border-color: #ea580c; color: #fff; font-weight: 600; }
+    .pill { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600; color: #64748b; cursor: pointer; white-space: nowrap; transition: all .15s; }
+    .pill:hover { border-color: #3b82f6; color: #1d4ed8; }
+    .pill.on { background: linear-gradient(135deg,#1d4ed8,#2563eb); border-color: transparent; color: #fff; }
 
     /* Badges */
-    .badge-pending { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
-    .ap-btn { display: flex; align-items: center; gap: 5px; border: none; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .ap-btn.on  { background: #16a34a; color: #fff; }
-    .ap-btn.off { background: #f1f5f9; color: #64748b; }
-    .ap-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .ap-btn.on  .ap-dot { background: #fff; animation: pulse 1.4s infinite; }
-    .ap-btn.off .ap-dot { background: #94a3b8; }
+    .badge-pending { background: linear-gradient(135deg,#fef3c7,#fde68a); color: #92400e; border: 1px solid #fcd34d; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 800; }
+    .ap-btn { display: flex; align-items: center; gap: 5px; border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .ap-btn.on  { background: linear-gradient(135deg,#16a34a,#15803d); color: #fff; }
+    .ap-btn.off { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+    .ap-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ap-btn.on  .ap-dot { background: #bbf7d0; animation: pulse 1.4s infinite; }
+    .ap-btn.off .ap-dot { background: rgba(255,255,255,0.4); }
 
-    /* Desktop table */
+    /* Table */
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 540px; }
-    th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    th { padding: 12px 14px; text-align: left; font-size: 10.5px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; background: #fafafa; }
+    th:first-child { border-radius: 0 0 0 0; }
+    td { padding: 12px 14px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
     tr:hover td { background: #f8fafc; }
     tr:last-child td { border-bottom: none; }
 
-    /* Bottom sheet overlay */
-    .sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; }
+    /* Bottom sheet */
+    .sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 100; backdrop-filter: blur(2px); }
     .sheet-overlay.open { display: block; }
-    .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 16px 16px 0 0; z-index: 101; max-height: 75vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); }
+    .sheet { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-radius: 20px 20px 0 0; z-index: 101; max-height: 80vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); }
     .sheet.open { transform: translateY(0); }
-    .sheet-handle { width: 36px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
-    .sheet-header { padding: 14px 18px 10px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
-    .sheet-body { overflow-y: auto; padding: 14px 18px 24px; flex: 1; -webkit-overflow-scrolling: touch; }
+    .sheet-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 14px auto 0; flex-shrink: 0; }
+    .sheet-header { padding: 14px 18px 12px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+    .sheet-body { overflow-y: auto; padding: 16px 18px 32px; flex: 1; -webkit-overflow-scrolling: touch; }
+
+    /* Section header */
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .section-title { font-size: 15px; font-weight: 800; color: '#0f172a'; }
 
     /* Bottom nav — mobile only */
     .bottom-nav { display: none; }
 
-    /* Spinners etc */
-    @keyframes spin   { to { transform: rotate(360deg); } }
-    @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.3} }
-    .spinner { width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: #ea580c; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .spinner { width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
 
-    /* Mobile (≤ 768px) */
+    /* Mobile */
     @media (max-width: 768px) {
-      .topbar { padding: 0 16px; height: 52px; }
+      .topbar { padding: 0 16px; height: 54px; }
       .desktop-nav { display: none; }
       .sidebar { display: none; }
-      .main { padding: 12px 14px 72px; }
-      .cal-cell { min-height: 46px; padding: 4px; }
+      .main { padding: 12px 14px 76px; }
+      .stats-row { gap: 8px; }
+      .cal-cell { min-height: 48px; padding: 4px; }
       .cal-num { font-size: 11px; }
       .pending-grid { grid-template-columns: 1fr; }
       .ap-label { display: none; }
       #mobile-bookings { display: flex !important; }
       .desktop-table { display: none; }
-
       .bottom-nav {
-        display: flex;
-        position: fixed; bottom: 0; left: 0; right: 0;
-        background: #fff; border-top: 1px solid #e2e8f0;
-        height: 58px; z-index: 50;
+        display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff; border-top: 1px solid #f1f5f9;
+        height: 62px; z-index: 50; box-shadow: 0 -4px 20px rgba(15,23,42,0.08);
       }
       .bnav-btn {
         flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
         gap: 3px; background: none; border: none; cursor: pointer;
-        font-size: 10px; font-weight: 500; color: #94a3b8; padding: 0;
+        font-size: 10px; font-weight: 600; color: #94a3b8; padding: 0;
         transition: color .15s;
       }
-      .bnav-btn.active { color: #ea580c; }
-      .bnav-icon { font-size: 19px; line-height: 1; }
+      .bnav-btn.active { color: #1d4ed8; }
+      .bnav-icon { font-size: 20px; line-height: 1; }
     }
-
     @media (max-width: 380px) {
       .topbar-brand span { display: none; }
-      .cal-head { font-size: 9px; }
     }
   `;
 
   if (loading) return (
     <>
       <style>{css}</style>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f0f4f8', gap: 16 }}>
         <div className="spinner" />
+        <div style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>Loading appointments…</div>
       </div>
     </>
   );
@@ -316,32 +367,26 @@ export default function DoctorDashboard() {
     </>
   );
 
-  const tabConfig = [
-    { key: 'calendar', label: 'Calendar', icon: '📅' },
-    { key: 'bookings', label: 'Bookings', icon: '📋' },
-    { key: 'pending',  label: `Pending${pending.length ? ` (${pending.length})` : ''}`, icon: '⏳', mobileLabel: 'Pending' },
-  ];
-
   return (
     <>
       <style>{css}</style>
+      <Toast toasts={toasts} />
       <div className="dash">
 
         {/* ── Topbar ── */}
         <header className="topbar">
           <div className="topbar-brand">
-            <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="logo"
-              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🩺</div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>Dr. SG Majeke</div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>General Practitioner</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>Dr. SG Majeke</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>General Practitioner</div>
             </div>
           </div>
 
           <nav className="desktop-nav">
             {tabConfig.map(t => (
               <button key={t.key} className={`nav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
-                {t.label}
+                {t.icon} {t.label}
               </button>
             ))}
           </nav>
@@ -349,7 +394,7 @@ export default function DoctorDashboard() {
           <div className="topbar-actions">
             <button type="button" className={`ap-btn ${autoPilot ? 'on' : 'off'}`}
               onClick={() => { if (!autoPilot) autoProcessedRef.current.clear(); setAutoPilot(p => !p); }}
-              title={autoPilot ? 'Auto Pilot ON' : 'Enable Auto Pilot'}>
+              title={autoPilot ? 'Auto Pilot ON — click to disable' : 'Enable Auto Pilot'}>
               <span className="ap-dot" />
               <span className="ap-label">Auto {autoPilot ? 'ON' : 'OFF'}</span>
             </button>
@@ -361,67 +406,76 @@ export default function DoctorDashboard() {
         <div className="body">
           <main className="main">
 
+            {/* Stats row */}
+            <div className="stats-row">
+              <StatCard icon="📅" label="Today's Appts"  value={todayApts.length}    color="#1d4ed8" bg="linear-gradient(135deg,#eff6ff,#dbeafe)" />
+              <StatCard icon="⏳" label="Pending"         value={pending.length}       color="#d97706" bg="linear-gradient(135deg,#fffbeb,#fef3c7)" />
+              <StatCard icon="✅" label="Confirmed Today" value={confirmedToday}        color="#15803d" bg="linear-gradient(135deg,#f0fdf4,#dcfce7)" />
+              <StatCard icon="📊" label="This Week"       value={thisWeekCount}         color="#7c3aed" bg="linear-gradient(135deg,#faf5ff,#ede9fe)" />
+            </div>
+
             {/* ── Calendar tab ── */}
             {tab === 'calendar' && (
               <>
-                <div className="cal-nav">
-                  <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}
-                    style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 13, color: '#334155' }}>‹</button>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{monthStr}</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button type="button" onClick={() => { setMonth(new Date()); setSelectedDay(today); }}
-                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: '#64748b' }}>Today</button>
-                    <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))}
-                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 13, color: '#334155' }}>›</button>
+                <div className="cal-wrap">
+                  <div className="cal-nav">
+                    <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1))}
+                      style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 14, color: '#334155', fontWeight: 700 }}>‹</button>
+                    <span style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{monthStr}</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" onClick={() => { setMonth(new Date()); setSelectedDay(today); }}
+                        style={{ background: 'linear-gradient(135deg,#eff6ff,#dbeafe)', border: '1px solid #bfdbfe', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', color: '#1d4ed8', fontWeight: 700 }}>Today</button>
+                      <button type="button" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1))}
+                        style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 14, color: '#334155', fontWeight: 700 }}>›</button>
+                    </div>
                   </div>
-                </div>
 
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '12px 10px' }}>
-                  <div className="cal-grid" style={{ marginBottom: 3 }}>
-                    {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} className="cal-head">{d}</div>)}
+                  <div className="cal-grid" style={{ marginBottom: 4 }}>
+                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => <div key={i} className="cal-head">{d}</div>)}
                   </div>
                   <div className="cal-grid">
                     {weeks.flatMap((wk, wi) => wk.map((cell, di) => {
                       if (!cell) return <div key={`e-${wi}-${di}`} />;
-                      const apts = forDay(cell.ds);
-                      const conf = apts.filter(a => a.status === 'confirmed').length;
-                      const pend = apts.filter(a => a.status === 'pending_approval').length;
-                      const isToday = cell.ds === today;
-                      const isSel   = cell.ds === selectedDay;
+                      const apts  = forDay(cell.ds);
+                      const conf  = apts.filter(a => a.status === 'confirmed').length;
+                      const pend  = apts.filter(a => a.status === 'pending_approval').length;
+                      const isTod = cell.ds === today;
+                      const isSel = cell.ds === selectedDay;
                       return (
                         <div key={cell.ds}
-                          className={`cal-cell${isToday ? ' today' : ''}${isSel ? ' selected' : ''}`}
+                          className={`cal-cell${isTod ? ' today' : ''}${isSel ? ' selected' : ''}`}
                           onClick={() => { setSelectedDay(cell.ds); setSheetOpen(true); }}>
                           <div className="cal-num">{cell.day}</div>
                           <div className="cal-dots">
-                            {Array.from({ length: Math.min(conf, 3) }).map((_, i) => <div key={`c${i}`} className="dot" style={{ background: '#16a34a' }} />)}
-                            {Array.from({ length: Math.min(pend, 3) }).map((_, i) => <div key={`p${i}`} className="dot" style={{ background: '#d97706' }} />)}
+                            {Array.from({ length: Math.min(conf, 4) }).map((_, i) => <div key={`c${i}`} className="dot" style={{ background: '#22c55e' }} />)}
+                            {Array.from({ length: Math.min(pend, 4) }).map((_, i) => <div key={`p${i}`} className="dot" style={{ background: '#f59e0b' }} />)}
                           </div>
-                          {apts.length > 0 && <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>{apts.length}</div>}
+                          {apts.length > 0 && <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2, fontWeight: 600 }}>{apts.length} appt{apts.length > 1 ? 's' : ''}</div>}
                         </div>
                       );
                     }))}
                   </div>
-                  <div style={{ display: 'flex', gap: 14, marginTop: 12, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
-                    {[['#16a34a','Confirmed'],['#d97706','Pending']].map(([c, l]) => (
-                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#64748b' }}>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+                    {[['#22c55e','Confirmed'],['#f59e0b','Pending'],['#ef4444','Rejected']].map(([c, l]) => (
+                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#64748b', fontWeight: 500 }}>
                         <div className="dot" style={{ background: c }} /> {l}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Desktop: show day appointments below calendar */}
                 {dayApts.length > 0 && (
                   <div style={{ marginTop: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>
-                      {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)} · {dayApts.length} appointment{dayApts.length !== 1 ? 's' : ''}
+                    <div className="section-head">
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                        {selectedDay === today ? '📅 Today' : `📅 ${fmtDateLong(selectedDay)}`}
+                        <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: '#94a3b8' }}>{dayApts.length} appointment{dayApts.length !== 1 ? 's' : ''}</span>
+                      </div>
                     </div>
                     <div className="card-list">
                       {dayApts.map(apt => (
                         <AptCard key={apt.id} apt={apt}
                           actionLoading={actionLoading[apt.id]}
-                          actionError={actionError[apt.id]}
                           onApprove={() => handleAction(apt.id, true)}
                           onReject={() => handleAction(apt.id, false)}
                           onOpen={() => setDetailApt(apt)} />
@@ -436,7 +490,7 @@ export default function DoctorDashboard() {
             {tab === 'bookings' && (
               <>
                 <div className="filter-bar">
-                  <input className="search-input" type="search" placeholder="Search name or phone…"
+                  <input className="search-input" type="search" placeholder="🔍  Search name or phone…"
                     value={search} onChange={e => setSearch(e.target.value)} />
                   <div className="pill-row">
                     {[['all','All'],['pending_approval','Pending'],['confirmed','Confirmed'],['rejected','Rejected']].map(([k, l]) => (
@@ -445,19 +499,19 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
 
-                {/* Mobile: card list */}
+                {/* Mobile cards */}
                 <div className="card-list" style={{ display: 'none' }} id="mobile-bookings">
                   {filtered.map(apt => (
                     <AptCard key={apt.id} apt={apt}
                       actionLoading={actionLoading[apt.id]}
-                      actionError={actionError[apt.id]}
                       onApprove={() => handleAction(apt.id, true)}
-                      onReject={() => handleAction(apt.id, false)} />
+                      onReject={() => handleAction(apt.id, false)}
+                      onOpen={() => setDetailApt(apt)} />
                   ))}
                 </div>
 
-                {/* Desktop: table */}
-                <div className="desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                {/* Desktop table */}
+                <div className="desktop-table" style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(15,23,42,0.06)', overflow: 'hidden' }}>
                   <div className="table-wrap">
                     <table>
                       <thead>
@@ -473,25 +527,28 @@ export default function DoctorDashboard() {
                       </thead>
                       <tbody>
                         {filtered.length === 0 && (
-                          <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>No appointments found</td></tr>
+                          <tr><td colSpan={7} style={{ textAlign: 'center', padding: '48px 0', color: '#cbd5e1' }}>
+                            <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>No appointments found</div>
+                          </td></tr>
                         )}
                         {filtered.map(apt => (
                           <tr key={apt.id} style={{ cursor: 'pointer' }} onClick={() => setDetailApt(apt)}>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Avatar name={apt.patient_name} size={28} />
-                                <span style={{ fontWeight: 600, color: '#0f172a' }}>{apt.patient_name || 'Unknown'}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <Avatar name={apt.patient_name} size={30} />
+                                <span style={{ fontWeight: 700, color: '#0f172a' }}>{apt.patient_name || 'Unknown'}</span>
                               </div>
                             </td>
                             <td style={{ color: '#64748b', fontSize: 12 }}>{apt.phone}</td>
                             <td>
-                              <div style={{ fontWeight: 500, fontSize: 12 }}>{fmtDate(apt.date)}</div>
-                              <div style={{ fontWeight: 700, color: '#ea580c', fontSize: 12 }}>{apt.time}</div>
+                              <div style={{ fontWeight: 600, fontSize: 12, color: '#334155' }}>{fmtDate(apt.date)}</div>
+                              <div style={{ fontWeight: 800, color: '#ea580c', fontSize: 13 }}>{apt.time}</div>
                             </td>
                             <td style={{ fontSize: 12 }}>
                               {apt.payment_method === 'medical_aid'
-                                ? <div><div style={{ fontWeight: 600 }}>{apt.medical_aid}</div><div style={{ fontSize: 11, color: '#94a3b8' }}>#{apt.membership_number}</div></div>
-                                : <span style={{ color: '#16a34a', fontWeight: 600 }}>Cash</span>}
+                                ? <div><div style={{ fontWeight: 700, color: '#0f172a' }}>{apt.medical_aid}</div><div style={{ fontSize: 11, color: '#94a3b8' }}>#{apt.membership_number}</div></div>
+                                : <span style={{ background: '#f0fdf4', color: '#15803d', borderRadius: 6, padding: '2px 8px', fontWeight: 700, fontSize: 11 }}>Cash</span>}
                             </td>
                             <td><SourceBadge source={apt.source} /></td>
                             <td><StatusBadge status={apt.status} /></td>
@@ -499,24 +556,23 @@ export default function DoctorDashboard() {
                               {apt.status === 'pending_approval' && (
                                 <div style={{ display: 'flex', gap: 6 }}>
                                   <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
-                                    style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                                    {actionLoading[apt.id] ? '…' : 'Approve'}
+                                    style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', border: 'none', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                    ✓ Approve
                                   </button>
                                   <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}
-                                    style={{ background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                                    {actionLoading[apt.id] ? '…' : 'Reject'}
+                                    style={{ background: '#fff', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                                    ✕ Reject
                                   </button>
                                 </div>
                               )}
-                              {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>{actionError[apt.id]}</p>}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <div style={{ padding: '8px 14px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#94a3b8' }}>
-                    {filtered.length} of {appointments.length} appointments
+                  <div style={{ padding: '10px 16px', borderTop: '1px solid #f8fafc', fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+                    Showing {filtered.length} of {appointments.length} appointments
                   </div>
                 </div>
               </>
@@ -525,50 +581,50 @@ export default function DoctorDashboard() {
             {/* ── Pending tab ── */}
             {tab === 'pending' && (
               pending.length === 0 ? (
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: '48px 24px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#16a34a', marginBottom: 6 }}>All clear</div>
-                  <p style={{ fontSize: 13, color: '#94a3b8' }}>No pending approvals</p>
+                <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', padding: '60px 24px', textAlign: 'center', boxShadow: '0 1px 4px rgba(15,23,42,0.06)' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#15803d', marginBottom: 6 }}>All clear!</div>
+                  <p style={{ fontSize: 13, color: '#94a3b8' }}>No pending approvals right now</p>
                 </div>
               ) : (
                 <div className="pending-grid">
                   {pending.map(apt => (
-                    <div key={apt.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', borderTop: '3px solid #d97706', overflow: 'hidden' }}>
-                      <div style={{ padding: 16 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                          <Avatar name={apt.patient_name} size={38} />
+                    <div key={apt.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid #f1f5f9', borderTop: '4px solid #f59e0b', overflow: 'hidden', boxShadow: '0 2px 8px rgba(245,158,11,0.1)' }}>
+                      <div style={{ padding: 18 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                          <Avatar name={apt.patient_name} size={42} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
-                            <div style={{ fontSize: 12, color: '#64748b' }}>{apt.phone}</div>
-                            <div style={{ marginTop: 3 }}><SourceBadge source={apt.source} /></div>
+                            <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.patient_name || 'Unknown'}</div>
+                            <div style={{ fontSize: 12, color: '#64748b', marginTop: 1 }}>{apt.phone}</div>
+                            <div style={{ marginTop: 4 }}><SourceBadge source={apt.source} /></div>
                           </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                          <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px' }}>
-                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Date</div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{fmtDate(apt.date)}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                          <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 10, padding: '10px 12px' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3 }}>📅 Date</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{fmtDate(apt.date)}</div>
                           </div>
-                          <div style={{ background: '#fff7ed', borderRadius: 6, padding: '8px 10px' }}>
-                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Time</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>{apt.time}</div>
+                          <div style={{ background: 'linear-gradient(135deg,#fff7ed,#ffedd5)', borderRadius: 10, padding: '10px 12px' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3 }}>🕐 Time</div>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: '#ea580c' }}>{apt.time}</div>
                           </div>
-                          <div style={{ background: '#f8fafc', borderRadius: 6, padding: '8px 10px', gridColumn: '1/-1' }}>
-                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>Payment</div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                          <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 10, padding: '10px 12px', gridColumn: '1/-1' }}>
+                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 3 }}>💳 Payment</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                               {apt.payment_method === 'medical_aid' ? `${apt.medical_aid} · #${apt.membership_number}` : 'Cash'}
                             </div>
                           </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>Submitted {fmtTs(apt.created_at)}</div>
-                        {actionError[apt.id] && <p style={{ color: '#dc2626', fontSize: 12, marginTop: 6 }}>{actionError[apt.id]}</p>}
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>Submitted {fmtTs(apt.created_at)}</div>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #f1f5f9' }}>
                         <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, true)}
-                          style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: '0 0 0 11px', padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1 }}>
-                          {actionLoading[apt.id] ? '…' : 'Approve'}
+                          style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', border: 'none', padding: '14px 0', fontSize: 14, fontWeight: 700, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1, borderRadius: '0 0 0 12px' }}>
+                          {actionLoading[apt.id] ? '…' : '✓ Approve'}
                         </button>
                         <button type="button" disabled={actionLoading[apt.id]} onClick={() => handleAction(apt.id, false)}
-                          style={{ background: '#fff', color: '#dc2626', border: 'none', borderLeft: '1px solid #f1f5f9', borderRadius: '0 0 11px 0', padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1 }}>
-                          {actionLoading[apt.id] ? '…' : 'Reject'}
+                          style={{ background: '#fff', color: '#dc2626', border: 'none', borderLeft: '1px solid #f1f5f9', padding: '14px 0', fontSize: 14, fontWeight: 700, cursor: actionLoading[apt.id] ? 'not-allowed' : 'pointer', opacity: actionLoading[apt.id] ? .5 : 1, borderRadius: '0 0 12px 0' }}>
+                          {actionLoading[apt.id] ? '…' : '✕ Reject'}
                         </button>
                       </div>
                     </div>
@@ -581,23 +637,26 @@ export default function DoctorDashboard() {
 
           {/* ── Desktop sidebar ── */}
           <aside className="sidebar">
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                {selectedDay === today ? '📅 Today' : `📅 ${fmtDateLong(selectedDay)}`}
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, fontWeight: 500 }}>
                 {dayApts.length === 0 ? 'No appointments' : `${dayApts.length} appointment${dayApts.length !== 1 ? 's' : ''}`}
               </div>
             </div>
             {dayApts.length === 0
-              ? <div style={{ textAlign: 'center', padding: '32px 0', color: '#cbd5e1', fontSize: 13 }}>Nothing scheduled</div>
+              ? <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🗓️</div>
+                  <div style={{ fontSize: 12, color: '#cbd5e1', fontWeight: 500 }}>Nothing scheduled</div>
+                </div>
               : <div className="card-list">
                   {dayApts.map(apt => (
                     <AptCard key={apt.id} apt={apt}
                       actionLoading={actionLoading[apt.id]}
-                      actionError={actionError[apt.id]}
                       onApprove={() => handleAction(apt.id, true)}
-                      onReject={() => handleAction(apt.id, false)} />
+                      onReject={() => handleAction(apt.id, false)}
+                      onOpen={() => setDetailApt(apt)} />
                   ))}
                 </div>
             }
@@ -607,42 +666,42 @@ export default function DoctorDashboard() {
         {/* ── Mobile bottom nav ── */}
         <nav className="bottom-nav">
           {tabConfig.map(t => (
-            <button key={t.key} className={`bnav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+            <button key={t.key} className={`bnav-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)} style={{ position: 'relative' }}>
               <span className="bnav-icon">{t.icon}</span>
-              <span>{t.mobileLabel || t.key.charAt(0).toUpperCase() + t.key.slice(1)}</span>
+              <span>{t.mobileLabel || t.label.split(' ')[0]}</span>
               {t.key === 'pending' && pending.length > 0 && (
-                <span style={{ position: 'absolute', top: 6, background: '#dc2626', color: '#fff', borderRadius: 10, padding: '1px 5px', fontSize: 9, fontWeight: 700 }}>{pending.length}</span>
+                <span style={{ position: 'absolute', top: 8, right: '25%', background: '#dc2626', color: '#fff', borderRadius: 10, padding: '1px 5px', fontSize: 9, fontWeight: 800 }}>{pending.length}</span>
               )}
             </button>
           ))}
         </nav>
 
-        {/* ── Mobile bottom sheet (day appointments) ── */}
+        {/* ── Mobile day sheet ── */}
         <div className={`sheet-overlay${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
         <div className={`sheet${sheetOpen ? ' open' : ''}`}>
           <div className="sheet-handle" />
           <div className="sheet-header">
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                {selectedDay === today ? 'Today' : fmtDateLong(selectedDay)}
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
+                {selectedDay === today ? '📅 Today' : `📅 ${fmtDateLong(selectedDay)}`}
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, fontWeight: 500 }}>
                 {dayApts.length === 0 ? 'No appointments' : `${dayApts.length} appointment${dayApts.length !== 1 ? 's' : ''}`}
               </div>
             </div>
             <button type="button" onClick={() => setSheetOpen(false)}
-              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, color: '#64748b' }}>✕</button>
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: 14, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
           </div>
           <div className="sheet-body">
             {dayApts.length === 0
-              ? <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '24px 0' }}>Nothing scheduled for this day</p>
+              ? <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '32px 0' }}>Nothing scheduled for this day</p>
               : <div className="card-list">
                   {dayApts.map(apt => (
                     <AptCard key={apt.id} apt={apt}
                       actionLoading={actionLoading[apt.id]}
-                      actionError={actionError[apt.id]}
                       onApprove={() => handleAction(apt.id, true)}
-                      onReject={() => handleAction(apt.id, false)} />
+                      onReject={() => handleAction(apt.id, false)}
+                      onOpen={() => { setSheetOpen(false); setDetailApt(apt); }} />
                   ))}
                 </div>
             }
@@ -653,89 +712,79 @@ export default function DoctorDashboard() {
         {detailApt && (
           <>
             <div className="sheet-overlay open" onClick={() => setDetailApt(null)} />
-            <div className="sheet open" style={{ maxHeight: '85vh' }}>
+            <div className="sheet open" style={{ maxHeight: '88vh' }}>
               <div className="sheet-handle" />
               <div className="sheet-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Avatar name={detailApt.patient_name} size={40} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Avatar name={detailApt.patient_name} size={44} />
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailApt.patient_name || 'Unknown'}</div>
-                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{detailApt.phone}</div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>{detailApt.patient_name || 'Unknown'}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>{detailApt.phone}</div>
                   </div>
                 </div>
                 <button type="button" onClick={() => setDetailApt(null)}
-                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: 14, color: '#64748b', flexShrink: 0 }}>✕</button>
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', fontSize: 14, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
               </div>
               <div className="sheet-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                  {[
-                    ['Date',    fmtDateLong(detailApt.date)],
-                    ['Time',    detailApt.time],
-                    ['Status',  null],
-                    ['Source',  null],
-                  ].map(([label, value]) => (
-                    <div key={label} style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>{label}</div>
-                      {label === 'Status'  && <StatusBadge status={detailApt.status} />}
-                      {label === 'Source'  && <SourceBadge source={detailApt.source} />}
-                      {value && <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{value}</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                  {[['📅 Date', fmtDateLong(detailApt.date)], ['🕐 Time', detailApt.time]].map(([label, value]) => (
+                    <div key={label} style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 5 }}>{label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: label.includes('Time') ? '#ea580c' : '#0f172a' }}>{value}</div>
                     </div>
                   ))}
+                  <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 5 }}>Status</div>
+                    <StatusBadge status={detailApt.status} />
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 5 }}>Source</div>
+                    <SourceBadge source={detailApt.source} />
+                  </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px', marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Payment</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '14px', marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 6 }}>💳 Payment</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
                     {detailApt.payment_method === 'medical_aid' ? 'Medical Aid' : 'Cash'}
                   </div>
                   {detailApt.payment_method === 'medical_aid' && (
-                    <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Provider</div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{detailApt.medical_aid || '—'}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>Provider</div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{detailApt.medical_aid || '—'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Plan</div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{detailApt.medical_plan || '—'}</div>
-                      </div>
-                      <div style={{ gridColumn: '1/-1' }}>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Membership No.</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{detailApt.membership_number || '—'}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>Membership No.</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{detailApt.membership_number || '—'}</div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {detailApt.email && (
-                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Email</div>
-                    <div style={{ fontSize: 13, color: '#0f172a' }}>{detailApt.email}</div>
-                  </div>
-                )}
-
                 {detailApt.reason && (
-                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Reason for Visit</div>
-                    <div style={{ fontSize: 13, color: '#0f172a', lineHeight: 1.5 }}>{detailApt.reason}</div>
+                  <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 5 }}>🩺 Reason for Visit</div>
+                    <div style={{ fontSize: 13, color: '#0f172a', lineHeight: 1.6 }}>{detailApt.reason}</div>
                   </div>
                 )}
 
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>Booking Submitted</div>
-                  <div style={{ fontSize: 13, color: '#0f172a' }}>{fmtTs(detailApt.created_at)}</div>
+                <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 5 }}>🕑 Submitted</div>
+                  <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 500 }}>{fmtTs(detailApt.created_at)}</div>
                 </div>
 
                 {detailApt.status === 'pending_approval' && (
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
                     <button type="button" disabled={actionLoading[detailApt.id]}
                       onClick={() => { handleAction(detailApt.id, true); setDetailApt(null); }}
-                      style={{ flex: 1, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                      Approve
+                      style={{ flex: 1, background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(22,163,74,0.3)' }}>
+                      ✓ Approve
                     </button>
                     <button type="button" disabled={actionLoading[detailApt.id]}
                       onClick={() => { handleAction(detailApt.id, false); setDetailApt(null); }}
-                      style={{ flex: 1, background: '#fff', color: '#dc2626', border: '1px solid #dc2626', borderRadius: 8, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                      Reject
+                      style={{ flex: 1, background: '#fff', color: '#dc2626', border: '2px solid #fca5a5', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>
+                      ✕ Reject
                     </button>
                   </div>
                 )}

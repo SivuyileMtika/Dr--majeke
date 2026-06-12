@@ -34,7 +34,7 @@ const {
 const { seedMedicalAids, seedServices, seedTimeSlots } = require('./utils/seeding');
 const { authMiddleware }            = require('./middleware/auth');
 const { confirmAppointmentHandler } = require('./controllers/appointmentController');
-const { sendWhatsAppMessage, sendFlowMessage } = require('./utils/whatsappButtons');
+const { sendWhatsAppMessage, sendWhatsAppButtons, sendFlowMessage } = require('./utils/whatsappButtons');
 const { decryptRequest, encryptResponse }     = require('./utils/flowCrypto');
 
 dotenv.config();
@@ -314,8 +314,8 @@ async function processWebhook(body) {
             else if (nextState === 'confirm_details') {
               const t = text.toLowerCase();
               if (t === 'back') {
-                await sendWhatsAppMessage(phone, 'Please enter your full name:\n\nType *Back* to go back.');
-                nextState = 'patient_name';
+                await sendWhatsAppMessage(phone, 'Please describe your reason for visit:\n\nType *Back* to re-enter ID number.');
+                nextState = 'reason_for_visit';
               } else if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
                 await createAppointment(db, {
                   phone,
@@ -335,8 +335,9 @@ async function processWebhook(body) {
                 );
                 nextState = 'complete';
               } else if (t === '2' || t.includes('cancel') || t.includes('no')) {
-                await sendWhatsAppMessage(phone, 'Booking cancelled. Send "Hi" to start over.');
-                nextState = 'initial';
+                await sendWhatsAppMessage(phone, 'Booking cancelled.');
+                await sendWhatsAppButtons(phone, "What would you like to do?", ['Book Appointment', 'View Price List']);
+                nextState = 'menu';
               }
             }
 

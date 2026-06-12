@@ -88,9 +88,8 @@ async function sendWhatsAppButtons(phone, prompt, buttons) {
     return data;
   } catch (err) {
     const detail = err.response?.data?.error?.message || err.message;
-    console.warn(`Interactive failed, falling back to text: ${detail}`);
-    const numbered = buttons.map((btn, i) => `${i + 1}. ${btn}`).join('\n');
-    return sendWhatsAppMessage(phone, `${prompt}\n\n${numbered}\n\nReply with the number of your choice.`);
+    console.error(`Interactive send failed: ${detail}`);
+    throw err;
   }
 }
 

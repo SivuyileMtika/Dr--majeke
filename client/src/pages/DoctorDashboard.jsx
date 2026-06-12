@@ -5,7 +5,8 @@ import axios from 'axios';
 import {
   Check, X, Clock, Phone, CreditCard, Stethoscope,
   AlertCircle, CalendarDays, User, MessageCircle, Globe,
-  Loader2, Search, List, ChevronLeft, ChevronRight,
+  Loader2, Search, List, ChevronLeft, ChevronRight, Mail,
+  FileText, Hash, ShieldCheck,
 } from 'lucide-react';
 
 const API_BASE   = process.env.REACT_APP_API_URL    || 'http://localhost:3000';
@@ -470,6 +471,7 @@ function StatusBadge({ status }) {
 
 function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
   const s = STATUS[apt.status] || { label: apt.status, color: '#374151', bg: '#f3f4f6' };
+  const reasonForVisit = apt.reason_for_visit || apt.reason || null;
   return (
     <>
       <div className="overlay" onClick={onClose} />
@@ -480,10 +482,12 @@ function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
           <button className="det-close" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="det-body">
+
           <div className="det-field">
             <div className="det-lbl"><AlertCircle size={10} /> Status</div>
             <span className="status-badge" style={{ background: s.bg, color: s.color, fontSize: 12 }}>{s.label}</span>
           </div>
+
           <div className="det-field">
             <div className="det-lbl"><CalendarDays size={10} /> Date &amp; Time</div>
             <div className="det-val">{fmtDate(apt.date)}</div>
@@ -491,50 +495,87 @@ function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
               <Clock size={12} />{apt.time}
             </div>
           </div>
+
           <div className="det-field">
             <div className="det-lbl"><Phone size={10} /> Phone</div>
-            <div className="det-val">{apt.phone}</div>
+            <div className="det-val">{apt.phone || '—'}</div>
           </div>
+
+          {apt.email && (
+            <div className="det-field">
+              <div className="det-lbl"><Mail size={10} /> Email</div>
+              <div className="det-val">{apt.email}</div>
+            </div>
+          )}
+
+          {apt.id_number && (
+            <div className="det-field">
+              <div className="det-lbl"><Hash size={10} /> ID Number</div>
+              <div className="det-val">{apt.id_number}</div>
+            </div>
+          )}
+
           <div className="det-field">
             <div className="det-lbl"><CreditCard size={10} /> Payment</div>
             <div className="det-val">{apt.payment_method === 'medical_aid' ? 'Medical Aid' : 'Cash'}</div>
           </div>
+
           {apt.payment_method === 'medical_aid' && (
             <>
               <div className="det-field">
-                <div className="det-lbl"><CreditCard size={10} /> Medical Aid</div>
+                <div className="det-lbl"><ShieldCheck size={10} /> Medical Aid</div>
                 <div className="det-val">{apt.medical_aid || '—'}</div>
               </div>
+              {apt.medical_plan && (
+                <div className="det-field">
+                  <div className="det-lbl"><ShieldCheck size={10} /> Plan</div>
+                  <div className="det-val">{apt.medical_plan}</div>
+                </div>
+              )}
               <div className="det-field">
-                <div className="det-lbl"><CreditCard size={10} /> Membership No.</div>
+                <div className="det-lbl"><Hash size={10} /> Membership No.</div>
                 <div className="det-val">{apt.membership_number || '—'}</div>
               </div>
             </>
           )}
-          {apt.reason && (
+
+          {reasonForVisit && (
             <div className="det-field">
-              <div className="det-lbl"><MessageCircle size={10} /> Reason for Visit</div>
-              <div className="det-val">{apt.reason}</div>
+              <div className="det-lbl"><FileText size={10} /> Reason for Visit</div>
+              <div className="det-val" style={{ background: '#f9fafb', padding: '8px 10px', borderRadius: 5, fontSize: 13, lineHeight: 1.5 }}>
+                {reasonForVisit}
+              </div>
             </div>
           )}
+
           {apt.rejection_reason && (
             <div className="det-field">
               <div className="det-lbl" style={{ color: '#dc2626' }}><X size={10} /> Rejection Reason</div>
-              <div className="det-val" style={{ color: '#7f1d1d', background: '#fee2e2', padding: '8px 10px', borderRadius: 5, fontSize: 12 }}>
+              <div className="det-val" style={{ color: '#7f1d1d', background: '#fee2e2', padding: '8px 10px', borderRadius: 5, fontSize: 12, lineHeight: 1.5 }}>
                 {apt.rejection_reason}
               </div>
             </div>
           )}
+
           <div className="det-field">
             <div className="det-lbl">
               {apt.source === 'website' ? <Globe size={10} /> : <MessageCircle size={10} />} Source
             </div>
-            <div className="det-val">{apt.source === 'website' ? 'Website booking' : 'WhatsApp booking'}</div>
+            <div className="det-val">{apt.source === 'website' ? 'Website' : 'WhatsApp'}</div>
           </div>
+
           <div className="det-field">
             <div className="det-lbl"><Clock size={10} /> Submitted</div>
             <div className="det-val">{fmtTs(apt.created_at)}</div>
           </div>
+
+          {apt.approved_at && (
+            <div className="det-field">
+              <div className="det-lbl"><Check size={10} /> {apt.status === 'confirmed' ? 'Approved' : 'Processed'} by</div>
+              <div className="det-val">{apt.approved_by || '—'} · {fmtTs(apt.approved_at)}</div>
+            </div>
+          )}
+
         </div>
         {apt.status === 'pending_approval' && (
           <div className="det-actions">
@@ -878,6 +919,14 @@ export default function DoctorDashboard() {
                       <td>
                         <div className="td-name">{apt.patient_name || 'Unknown'}</div>
                         <div className="td-phone"><Phone size={10} />{apt.phone}</div>
+                        {(apt.reason_for_visit || apt.reason) && (
+                          <div className="td-phone" style={{ color: '#6b7280', marginTop: 2 }}>
+                            <FileText size={10} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180, display: 'inline-block' }}>
+                              {apt.reason_for_visit || apt.reason}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td><div className="td-date">{fmtDateShort(apt.date)}</div></td>
                       <td><div className="td-time"><Clock size={11} />{apt.time}</div></td>
@@ -885,6 +934,7 @@ export default function DoctorDashboard() {
                         {apt.payment_method === 'medical_aid' ? (
                           <>
                             <div className="td-pay">{apt.medical_aid || 'Medical Aid'}</div>
+                            {apt.medical_plan && <div className="td-pay-sub">{apt.medical_plan}</div>}
                             {apt.membership_number && <div className="td-pay-sub">#{apt.membership_number}</div>}
                           </>
                         ) : <div className="td-pay">Cash</div>}

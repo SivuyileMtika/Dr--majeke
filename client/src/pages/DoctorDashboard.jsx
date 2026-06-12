@@ -400,36 +400,61 @@ const CSS = `
 function RejectModal({ apt, loading, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
   return (
-    <div className="modal-overlay">
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-hdr">
-          <X size={17} className="modal-hdr-icon" />
-          <span className="modal-title">Reject Appointment</span>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center' }} onClick={onCancel}>
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)',
+      zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 8, width: '100%', maxWidth: 420,
+        boxShadow: '0 8px 40px rgba(0,0,0,.18)', overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <X size={17} color="#dc2626" style={{ flexShrink: 0 }} />
+          <span style={{ fontWeight: 700, fontSize: 15, flex: 1, color: '#111827' }}>Reject Appointment</span>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', padding: 2 }}>
             <X size={16} />
           </button>
         </div>
-        <div className="modal-body">
-          <div className="modal-patient">
-            Rejecting appointment for <strong>{apt.patient_name || 'Unknown'}</strong>
+        {/* Body */}
+        <div style={{ padding: '16px 20px' }}>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>
+            Rejecting appointment for{' '}
+            <strong style={{ color: '#111827', fontWeight: 600 }}>{apt.patient_name || 'Unknown'}</strong>
             {' '}— {apt.date} at {apt.time}
-          </div>
-          <label className="modal-label" htmlFor="reject-reason">
-            Reason for rejection <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional — sent to patient)</span>
+          </p>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+            Reason for rejection{' '}
+            <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional — sent to patient on WhatsApp)</span>
           </label>
           <textarea
-            id="reject-reason"
-            className="modal-textarea"
+            autoFocus
             placeholder="e.g. No availability on this date, please call to reschedule…"
             value={reason}
             onChange={e => setReason(e.target.value)}
-            autoFocus
+            style={{
+              width: '100%', border: '1px solid #d1d5db', borderRadius: 5,
+              padding: '9px 12px', fontSize: 13, fontFamily: 'inherit',
+              color: '#111827', resize: 'vertical', minHeight: 90, outline: 'none',
+              boxSizing: 'border-box',
+            }}
           />
         </div>
-        <div className="modal-footer">
-          <button className="modal-cancel" onClick={onCancel}>Cancel</button>
-          <button className="modal-confirm" disabled={loading} onClick={() => onConfirm(reason)}>
-            {loading ? <Loader2 size={13} className="spinner" /> : <X size={13} />}
+        {/* Footer */}
+        <div style={{ padding: '0 20px 18px', display: 'flex', gap: 9, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={{
+            background: 'none', border: '1px solid #d1d5db', borderRadius: 5,
+            padding: '7px 16px', fontSize: 13, fontWeight: 500, color: '#6b7280', cursor: 'pointer',
+          }}>
+            Cancel
+          </button>
+          <button disabled={loading} onClick={() => onConfirm(reason)} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: loading ? '#f87171' : '#dc2626', color: '#fff',
+            border: 'none', borderRadius: 5, padding: '7px 16px',
+            fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+          }}>
+            {loading ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <X size={13} />}
             {loading ? 'Rejecting…' : 'Confirm Rejection'}
           </button>
         </div>

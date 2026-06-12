@@ -13,7 +13,7 @@ function toE164(phone) {
 }
 
 async function confirmAppointmentHandler(db, req, res) {
-  const { appointmentId, confirm, doctorName } = req.body || {};
+  const { appointmentId, confirm, doctorName, rejectionReason } = req.body || {};
   if (!appointmentId || typeof confirm !== 'boolean') {
     return res.status(400).json({ success: false, error: 'Invalid input' });
   }
@@ -29,11 +29,16 @@ async function confirmAppointmentHandler(db, req, res) {
     const status = confirm ? 'confirmed' : 'rejected';
     const clinic = doctorName || 'Dr. SG Majeke';
 
-    await ref.update({
+    const update = {
       status,
       approved_by: clinic,
       approved_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (!confirm && rejectionReason && rejectionReason.trim()) {
+      update.rejection_reason = rejectionReason.trim();
+    }
+
+    await ref.update(update);
 
     const slots = await db.collection('time_slots')
       .where('date', '==', apt.date)
@@ -49,7 +54,7 @@ async function confirmAppointmentHandler(db, req, res) {
 
     const message = confirm
       ? `Hello ${apt.patient_name}, your appointment on ${dateDisplay} at ${apt.time} has been CONFIRMED. Please arrive 10 minutes early. - ${clinic}`
-      : `Hello ${apt.patient_name}, your appointment request for ${dateDisplay} at ${apt.time} has been declined. Please call us to reschedule. - ${clinic}`;
+      : `Hello ${apt.patient_name}, your appointment request for ${dateDisplay} at ${apt.time} has been declined.${rejectionReason && rejectionReason.trim() ? ` Reason: ${rejectionReason.trim()}.` : ''} Please call us to reschedule. - ${clinic}`;
 
     const phone = toE164(apt.phone);
     try {

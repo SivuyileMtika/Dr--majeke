@@ -310,6 +310,51 @@ const CSS = `
   .spinner { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Rejection modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.35);
+    z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: #fff; border-radius: 8px; width: 100%; max-width: 420px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  }
+  .modal-hdr {
+    padding: 16px 20px 14px; border-bottom: 1px solid #f3f4f6;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .modal-hdr-icon { color: #dc2626; flex-shrink: 0; }
+  .modal-title { font-weight: 700; font-size: 15px; flex: 1; }
+  .modal-body { padding: 16px 20px; }
+  .modal-patient { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+  .modal-patient strong { color: #111827; font-weight: 600; }
+  .modal-label { font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; display: block; }
+  .modal-textarea {
+    width: 100%; border: 1px solid #d1d5db; border-radius: 5px;
+    padding: 9px 12px; font-size: 13px; font-family: inherit;
+    color: #111827; resize: vertical; min-height: 90px; outline: none;
+    transition: border-color .1s;
+  }
+  .modal-textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+  .modal-textarea::placeholder { color: #9ca3af; }
+  .modal-footer {
+    padding: 12px 20px 16px; display: flex; gap: 9px; justify-content: flex-end;
+  }
+  .modal-cancel {
+    background: none; border: 1px solid #d1d5db; border-radius: 5px;
+    padding: 7px 16px; font-size: 13px; font-weight: 500; color: #6b7280;
+    cursor: pointer; transition: all .1s;
+  }
+  .modal-cancel:hover { border-color: #9ca3af; color: #374151; }
+  .modal-confirm {
+    display: flex; align-items: center; gap: 5px;
+    background: #dc2626; color: #fff; border: none; border-radius: 5px;
+    padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background .1s;
+  }
+  .modal-confirm:hover    { background: #b91c1c; }
+  .modal-confirm:disabled { opacity: .5; cursor: not-allowed; }
+
   .banner {
     position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
     background: #111827; color: #fff; border-radius: 5px;
@@ -351,6 +396,47 @@ const CSS = `
   .m-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
   .m-card-actions { display: flex; gap: 6px; margin-top: 8px; }
 `;
+
+function RejectModal({ apt, loading, onConfirm, onCancel }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="modal-overlay">
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-hdr">
+          <X size={17} className="modal-hdr-icon" />
+          <span className="modal-title">Reject Appointment</span>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center' }} onClick={onCancel}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-patient">
+            Rejecting appointment for <strong>{apt.patient_name || 'Unknown'}</strong>
+            {' '}— {apt.date} at {apt.time}
+          </div>
+          <label className="modal-label" htmlFor="reject-reason">
+            Reason for rejection <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional — sent to patient)</span>
+          </label>
+          <textarea
+            id="reject-reason"
+            className="modal-textarea"
+            placeholder="e.g. No availability on this date, please call to reschedule…"
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onCancel}>Cancel</button>
+          <button className="modal-confirm" disabled={loading} onClick={() => onConfirm(reason)}>
+            {loading ? <Loader2 size={13} className="spinner" /> : <X size={13} />}
+            {loading ? 'Rejecting…' : 'Confirm Rejection'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function StatusBadge({ status }) {
   const s = STATUS[status] || { label: status, color: '#374151', bg: '#f3f4f6' };
@@ -402,8 +488,16 @@ function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
           )}
           {apt.reason && (
             <div className="det-field">
-              <div className="det-lbl"><MessageCircle size={10} /> Reason</div>
+              <div className="det-lbl"><MessageCircle size={10} /> Reason for Visit</div>
               <div className="det-val">{apt.reason}</div>
+            </div>
+          )}
+          {apt.rejection_reason && (
+            <div className="det-field">
+              <div className="det-lbl" style={{ color: '#dc2626' }}><X size={10} /> Rejection Reason</div>
+              <div className="det-val" style={{ color: '#7f1d1d', background: '#fee2e2', padding: '8px 10px', borderRadius: 5, fontSize: 12 }}>
+                {apt.rejection_reason}
+              </div>
             </div>
           )}
           <div className="det-field">
@@ -425,7 +519,7 @@ function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
               {!loading && 'Approve'}
             </button>
             <button className="btn-r" style={{ flex: 1 }} disabled={loading}
-              onClick={() => { onReject(); onClose(); }}>
+              onClick={() => { onReject(); }}>
               {loading ? <Loader2 size={13} className="spinner" /> : <X size={13} />}
               {!loading && 'Reject'}
             </button>
@@ -436,7 +530,7 @@ function DetailPane({ apt, loading, onApprove, onReject, onClose }) {
   );
 }
 
-function CalendarView({ appointments, onOpenApt, act, actionLoading }) {
+function CalendarView({ appointments, onOpenApt, onReject, act, actionLoading }) {
   const [month, setMonth]     = useState(new Date());
   const [dayPanel, setDayPanel] = useState(null);
 
@@ -566,7 +660,7 @@ function CalendarView({ appointments, onOpenApt, act, actionLoading }) {
                             <button className="btn-a" disabled={!!actionLoading[apt.id]} onClick={() => act(apt.id, true)}>
                               <Check size={11} /> Approve
                             </button>
-                            <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => act(apt.id, false)}>
+                            <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => onReject(apt)}>
                               <X size={11} /> Reject
                             </button>
                           </div>
@@ -601,6 +695,7 @@ export default function DoctorDashboard() {
   const [autoPilot, setAutoPilot]       = useState(() => localStorage.getItem('autopilot') === 'true');
   const autoProcessed                   = useRef(new Set());
   const [detail, setDetail]             = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
   const [banner, setBanner]             = useState(null);
   const bannerTimer                     = useRef(null);
 
@@ -631,11 +726,11 @@ export default function DoctorDashboard() {
     );
   }, []);
 
-  const act = async (id, confirm) => {
+  const act = async (id, confirm, rejectionReason) => {
     setActionLoading(s => ({ ...s, [id]: true }));
     try {
       await axios.post(`${API_BASE}/confirm-appointment`,
-        { appointmentId: id, confirm, doctorName: 'Dr. SG Majeke' },
+        { appointmentId: id, confirm, doctorName: 'Dr. SG Majeke', rejectionReason: rejectionReason || '' },
         { headers: { Authorization: `Bearer ${AUTH_TOKEN}`, 'Content-Type': 'application/json' } }
       );
       showBanner(confirm ? 'Appointment approved' : 'Appointment rejected');
@@ -643,8 +738,11 @@ export default function DoctorDashboard() {
       showBanner(e.response?.data?.error || 'Action failed');
     } finally {
       setActionLoading(s => ({ ...s, [id]: false }));
+      setRejectTarget(null);
     }
   };
+
+  const startReject = apt => setRejectTarget(apt);
 
   const counts = {
     all:              appointments.length,
@@ -779,7 +877,7 @@ export default function DoctorDashboard() {
                               {actionLoading[apt.id] ? <Loader2 size={12} className="spinner" /> : <Check size={12} />}
                               Approve
                             </button>
-                            <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => act(apt.id, false)}>
+                            <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => startReject(apt)}>
                               {actionLoading[apt.id] ? <Loader2 size={12} className="spinner" /> : <X size={12} />}
                               Reject
                             </button>
@@ -817,7 +915,7 @@ export default function DoctorDashboard() {
                         <button className="btn-a" disabled={!!actionLoading[apt.id]} onClick={() => act(apt.id, true)}>
                           <Check size={12} /> Approve
                         </button>
-                        <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => act(apt.id, false)}>
+                        <button className="btn-r" disabled={!!actionLoading[apt.id]} onClick={() => startReject(apt)}>
                           <X size={12} /> Reject
                         </button>
                       </div>
@@ -842,6 +940,7 @@ export default function DoctorDashboard() {
           <CalendarView
             appointments={appointments}
             onOpenApt={setDetail}
+            onReject={startReject}
             act={act}
             actionLoading={actionLoading}
           />
@@ -854,8 +953,17 @@ export default function DoctorDashboard() {
           apt={detail}
           loading={!!actionLoading[detail.id]}
           onApprove={() => act(detail.id, true)}
-          onReject={() => act(detail.id, false)}
+          onReject={() => startReject(detail)}
           onClose={() => setDetail(null)}
+        />
+      )}
+
+      {rejectTarget && (
+        <RejectModal
+          apt={rejectTarget}
+          loading={!!actionLoading[rejectTarget.id]}
+          onConfirm={reason => act(rejectTarget.id, false, reason)}
+          onCancel={() => setRejectTarget(null)}
         />
       )}
 

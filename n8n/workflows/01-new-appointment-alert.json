@@ -1,0 +1,62 @@
+{
+  "name": "01 - Dr Majeke New Appointment Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "majeke-new-booking",
+        "responseMode": "immediately",
+        "options": {}
+      },
+      "id": "wh-node-01-majeke",
+      "name": "New Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "majeke-new-booking"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=`https://graph.facebook.com/v20.0/${$vars.WA_PHONE_NUMBER_ID}/messages`",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=`Bearer ${$vars.WA_ACCESS_TOKEN}`"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $vars.DOCTOR_PHONE,\n  type: 'text',\n  text: {\n    body:\n      '🔔 New Booking Request\\n\\n' +\n      '👤 Patient: ' + $json.patient_name + '\\n' +\n      '📱 Phone: ' + $json.phone + '\\n' +\n      '🪪 ID: ' + ($json.id_number || 'Not provided') + '\\n' +\n      '📅 Date: ' + $json.date + ' at ' + $json.time + '\\n' +\n      '💳 Payment: ' + ($json.payment_method === 'medical_aid'\n        ? ($json.medical_aid || '') + ($json.medical_plan ? ' (' + $json.medical_plan + ')' : '') + ' #' + ($json.membership_number || 'N/A')\n        : 'Cash') + '\\n' +\n      '💬 Reason: ' + ($json.reason_for_visit || 'Not specified') + '\\n' +\n      '📌 Source: ' + ($json.source || 'WhatsApp') + '\\n\\n' +\n      '✅ Open your dashboard to approve or reject.'\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "http-node-01-doctor",
+      "name": "WhatsApp Alert to Doctor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Booking Webhook": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Alert to Doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dr-majeke-wf-01"
+}

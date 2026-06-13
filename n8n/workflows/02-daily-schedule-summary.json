@@ -1,0 +1,119 @@
+{
+  "name": "02 - Dr Majeke Daily Schedule Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "sched-node-02-majeke",
+      "name": "Every Weekday 7am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=`${$vars.SERVER_URL}/appointments/today`",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=`Bearer ${$vars.DOCTOR_AUTH_TOKEN}`"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-node-02-fetch",
+      "name": "Fetch Today's Appointments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const response = $input.first().json;\nconst appointments = response.data || [];\n\nconst today = new Date().toLocaleDateString('en-ZA', {\n  weekday: 'long', day: 'numeric', month: 'long'\n});\n\nif (appointments.length === 0) {\n  return [{ json: { message: `📅 Good morning Doctor!\\n\\nNo appointments scheduled for today (${today}).\\n\\nHave a great day! 😊` } }];\n}\n\nconst lines = appointments.map((apt, i) => {\n  const payment = apt.payment_method === 'medical_aid'\n    ? `${apt.medical_aid || ''}${apt.medical_plan ? ' (' + apt.medical_plan + ')' : ''}`\n    : 'Cash';\n  return `${i + 1}. ${apt.time} — ${apt.patient_name}\\n   💬 ${apt.reason_for_visit || apt.reason || 'No reason given'}\\n   💳 ${payment}\\n   📌 ${apt.status === 'confirmed' ? '✅ Confirmed' : '⏳ Pending'}`;\n});\n\nconst message = `📅 Good morning Doctor!\\n\\nSchedule for ${today}:\\n${appointments.length} appointment${appointments.length === 1 ? '' : 's'}\\n\\n${lines.join('\\n\\n')}\\n\\nHave a productive day! 💪`;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "code-node-02-format",
+      "name": "Format Summary Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=`https://graph.facebook.com/v20.0/${$vars.WA_PHONE_NUMBER_ID}/messages`",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=`Bearer ${$vars.WA_ACCESS_TOKEN}`"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $vars.DOCTOR_PHONE,\n  type: 'text',\n  text: { body: $json.message }\n}) }}",
+        "options": {}
+      },
+      "id": "http-node-02-send",
+      "name": "Send Daily Summary to Doctor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Weekday 7am": {
+      "main": [
+        [
+          {
+            "node": "Fetch Today's Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Today's Appointments": {
+      "main": [
+        [
+          {
+            "node": "Format Summary Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary Message": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Summary to Doctor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dr-majeke-wf-02"
+}

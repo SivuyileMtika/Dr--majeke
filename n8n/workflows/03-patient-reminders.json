@@ -1,0 +1,142 @@
+{
+  "name": "03 - Dr Majeke Patient Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "sched-node-03-majeke",
+      "name": "Every Weekday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=`${$vars.SERVER_URL}/appointments/tomorrow`",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=`Bearer ${$vars.DOCTOR_AUTH_TOKEN}`"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-node-03-fetch",
+      "name": "Fetch Tomorrow's Appointments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const response = $input.first().json;\nconst appointments = response.data || [];\n\nif (appointments.length === 0) {\n  return [];\n}\n\n// Return one item per appointment so Split In Batches can loop\nreturn appointments.map(apt => ({ json: apt }));"
+      },
+      "id": "code-node-03-split",
+      "name": "Prepare Reminder Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "batch-node-03",
+      "name": "One Patient at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=`https://graph.facebook.com/v20.0/${$vars.WA_PHONE_NUMBER_ID}/messages`",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=`Bearer ${$vars.WA_ACCESS_TOKEN}`"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  messaging_product: 'whatsapp',\n  to: $json.phone.replace('+', ''),\n  type: 'text',\n  text: {\n    body:\n      `Hi ${$json.patient_name} 👋\\n\\n` +\n      `This is a reminder that you have an appointment with *Dr. SG Majeke* tomorrow.\\n\\n` +\n      `📅 Date: ${new Date($json.date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' })}\\n` +\n      `🕐 Time: ${$json.time}\\n\\n` +\n      `📍 F254 Ngcwabe St, Mt Frere, 5090\\n\\n` +\n      `Please arrive 10 minutes early. If you need to reschedule, reply to this message or call the practice.\\n\\n` +\n      `See you tomorrow! 😊`\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "http-node-03-remind",
+      "name": "Send Patient Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Weekday 8am": {
+      "main": [
+        [
+          {
+            "node": "Fetch Tomorrow's Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Tomorrow's Appointments": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reminder Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reminder Items": {
+      "main": [
+        [
+          {
+            "node": "One Patient at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Patient at a Time": {
+      "main": [
+        [
+          {
+            "node": "Send Patient Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dr-majeke-wf-03"
+}

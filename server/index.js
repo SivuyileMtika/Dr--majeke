@@ -14,6 +14,8 @@ const {
   getAvailableSlots,
   getAvailableDates,
   getBookedSlots,
+  getTodayAppointments,
+  getTomorrowAppointments,
 } = require('./utils/fireStoreHelpers');
 const {
   handleInitialMessage,
@@ -116,6 +118,22 @@ function fmtDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
     weekday: 'short', day: 'numeric', month: 'short',
   });
+}
+
+async function notifyN8n(appointmentData) {
+  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  if (!webhookUrl) return;
+  try {
+    const res = await fetch(webhookUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(appointmentData),
+    });
+    if (!res.ok) console.warn(`n8n notification returned ${res.status}`);
+    else console.log('n8n notified of new appointment');
+  } catch (err) {
+    console.warn('n8n notification failed (non-critical):', err.message);
+  }
 }
 
 // WhatsApp Flow endpoint — handles dynamic data for each screen
@@ -317,7 +335,7 @@ async function processWebhook(body) {
                 await sendWhatsAppMessage(phone, 'Please describe your reason for visit:\n\nType *Back* to re-enter ID number.');
                 nextState = 'reason_for_visit';
               } else if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
-                await createAppointment(db, {
+                const apt = await createAppointment(db, {
                   phone,
                   patient_name:      collectedData.patient_name,
                   date:              collectedData.selected_date,
@@ -330,6 +348,20 @@ async function processWebhook(body) {
                   reason_for_visit:  collectedData.reason_for_visit || null,
                 });
                 await markSlotPending(db, collectedData.selected_slot_id, phone);
+                notifyN8n({
+                  appointment_id:    apt.id,
+                  phone,
+                  patient_name:      collectedData.patient_name,
+                  date:              collectedData.selected_date,
+                  time:              collectedData.selected_time,
+                  payment_method:    collectedData.payment_method,
+                  medical_aid:       collectedData.medical_aid || null,
+                  medical_plan:      collectedData.medical_plan || null,
+                  membership_number: collectedData.membership_number || null,
+                  id_number:         collectedData.id_number || null,
+                  reason_for_visit:  collectedData.reason_for_visit || null,
+                  source:            'whatsapp',
+                }).catch(() => {});
                 await sendWhatsAppMessage(phone,
                   `Thank you ${collectedData.patient_name}! Your booking is pending doctor approval. You will receive confirmation within 24 hours.`
                 );
@@ -411,10 +443,43 @@ app.post('/book', async (req, res) => {
       reason:       reason || null,
       medical_plan: medical_plan || null,
     });
+    notifyN8n({
+      appointment_id:    apt.id,
+      phone,
+      patient_name,
+      date,
+      time,
+      payment_method:    payment_method || 'cash',
+      medical_aid:       medical_aid || null,
+      medical_plan:      medical_plan || null,
+      membership_number: membership_number || null,
+      reason_for_visit:  reason || null,
+      source:            'website',
+    }).catch(() => {});
     return res.json({ success: true, appointmentId: apt.id });
   } catch (err) {
     console.error('book endpoint error:', err);
     return res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+// n8n schedule endpoints — returns appointments for today / tomorrow
+// Protected by the same doctor auth token
+app.get('/appointments/today', authMiddleware, async (req, res) => {
+  try {
+    res.json({ success: true, data: await getTodayAppointments(db) });
+  } catch (err) {
+    console.error('appointments/today error:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
+app.get('/appointments/tomorrow', authMiddleware, async (req, res) => {
+  try {
+    res.json({ success: true, data: await getTomorrowAppointments(db) });
+  } catch (err) {
+    console.error('appointments/tomorrow error:', err);
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 

@@ -132,6 +132,28 @@ function getNextSevenDays() {
   });
 }
 
+async function getTodayAppointments(db) {
+  const today = new Date().toISOString().split('T')[0];
+  const snap = await db.collection('appointments')
+    .where('date', '==', today)
+    .where('status', 'in', ['confirmed', 'pending_approval'])
+    .orderBy('time', 'asc')
+    .get();
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function getTomorrowAppointments(db) {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const tomorrow = d.toISOString().split('T')[0];
+  const snap = await db.collection('appointments')
+    .where('date', '==', tomorrow)
+    .where('status', '==', 'confirmed')
+    .orderBy('time', 'asc')
+    .get();
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
 module.exports = {
   getOrCreateConversation,
   updateConversationState,
@@ -145,4 +167,6 @@ module.exports = {
   getServices,
   getMedicalAids,
   getNextSevenDays,
+  getTodayAppointments,
+  getTomorrowAppointments,
 };

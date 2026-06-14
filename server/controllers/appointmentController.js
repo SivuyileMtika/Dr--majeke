@@ -1,6 +1,7 @@
 const admin  = require('firebase-admin');
 const { markSlotConfirmed, markSlotAvailable } = require('../utils/fireStoreHelpers');
 const { sendWhatsAppMessage } = require('../utils/whatsappButtons');
+const { createAppointmentEvent } = require('../utils/googleCalendar');
 
 function toE164(phone) {
   if (!phone) return null;
@@ -47,6 +48,10 @@ async function confirmAppointmentHandler(db, req, res) {
     if (!slots.empty) {
       if (confirm) await markSlotConfirmed(db, slots.docs[0].id);
       else          await markSlotAvailable(db, slots.docs[0].id);
+    }
+
+    if (confirm) {
+      createAppointmentEvent(apt.patient_name, apt.date, apt.time).catch(() => {});
     }
 
     const date        = new Date(`${apt.date}T${apt.time}`);

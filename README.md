@@ -1,41 +1,47 @@
-# WhatsApp Booking System for a Doctor
+# Dr Majeke – Appointment Booking System
 
-This repository is a scaffold for a WhatsApp-based appointment booking system.
+Patient-facing booking site and doctor dashboard for a general practice in Mt Frere.
 
-Features:
-- Node/Express webhook that receives WhatsApp Cloud API messages and writes to Firestore.
-- Auto-creates appointment entries when patient messages include "book" or "appointment".
-- React/Bootstrap doctor dashboard that shows pending bookings using Firestore onSnapshot.
-- Doctor can confirm/reject appointments; server sends WhatsApp reply via Cloud API.
+## Stack
 
-Folders:
-- server/ - Express server, Firebase Admin helpers, WhatsApp sender util
-- client/ - React app with doctor dashboard components
+- **Frontend** – React + TypeScript + Tailwind CSS (Vite)
+- **Backend** – Node.js / Express
+- **Database** – Firebase / Firestore
+- **Messaging** – WhatsApp Cloud API
+- **Deployment** – Railway
 
-Quick start (local development):
+## Project structure
 
-1. Server
-- Create a Firebase service account JSON and set it in the environment variable FIREBASE_SERVICE_ACCOUNT (as a JSON string or a path to file).
-- Create a .env from server/.env.example and set WHATSAPP_TOKEN, WHATSAPP_PHONE_ID and WHATSAPP_VERIFY_TOKEN.
-- Install and start server:
+```
+server/    Express webhook + appointment logic
+client/    React doctor dashboard (WhatsApp bookings)
+project/   Main patient-facing site
+```
 
-  # from repository root
-  cd server
-  npm install
-  npm run dev
+## Running locally
 
-2. Client
-- Add a Firebase web config to environment variables for React (REACT_APP_...)
-- Install and start client:
+**Server**
+```bash
+cd server
+cp .env.example .env   # fill in credentials
+npm install
+npm run dev
+```
 
-  cd client
-  npm install
-  npm start
+**Patient site**
+```bash
+cd project
+npm install
+npm run dev
+```
 
-Firestore rules and example indexes are included in `firestore.rules` and `firestore.indexes.json`.
+**Doctor dashboard**
+```bash
+cd client
+npm install
+npm start
+```
 
-Production notes:
-- Use Cloud Functions or Cloud Run for the webhook for better scaling.
-- Keep WhatsApp API tokens and service accounts secure; do not check secrets into git.
-- Validate webhook signature and apply rate limits before deploying.
+## Environment variables
 
+See `server/.env.example` for required server config (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `FIREBASE_SERVICE_ACCOUNT`, `DOCTOR_AUTH_TOKEN`).

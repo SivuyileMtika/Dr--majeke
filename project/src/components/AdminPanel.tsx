@@ -8,7 +8,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'declined'>('all');
 
   useEffect(() => {
-    // Load appointments from localStorage
     const storedAppointments = localStorage.getItem('appointments');
     if (storedAppointments) {
       setAppointments(JSON.parse(storedAppointments));
@@ -21,8 +20,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
     );
     setAppointments(updatedAppointments);
     localStorage.setItem('appointments', JSON.stringify(updatedAppointments));
-    
-    // Trigger a custom event to notify other components of the change
     window.dispatchEvent(new CustomEvent('appointmentsUpdated'));
   };
 
@@ -35,14 +32,9 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   });
 
   const sortedFilteredAppointments = [...filteredAppointments].sort((a, b) => {
-    // Only sort if status is 'pending'
     if (a.status === 'pending' && b.status === 'pending') {
-      // Combine date and time for comparison
-      const aDateTime = new Date(`${a.date}T${a.time}`);
-      const bDateTime = new Date(`${b.date}T${b.time}`);
-      return aDateTime.getTime() - bDateTime.getTime();
+      return new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime();
     }
-    // Otherwise, keep original order
     return 0;
   });
 
@@ -82,14 +74,12 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const approvedCount = appointments.filter(a => a.status === 'approved').length;
   const declinedCount = appointments.filter(a => a.status === 'declined').length;
 
-  // Back button handler
   const handleBack = () => {
     if (onBack) onBack();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 py-8">
-      {/* Back Button — far left */}
       <div className="px-4 mb-4">
         <button
           type="button"
@@ -103,7 +93,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* Header with logo */}
         <div className="mb-4 flex items-center gap-3 bg-white rounded-xl shadow-md px-4 py-3 border-l-4 border-orange-600">
           <img
             src={`${import.meta.env.BASE_URL}logo.png`}
@@ -116,7 +105,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           <div className="bg-white rounded-xl shadow p-3 border border-gray-100">
             <div className="flex items-center justify-between">
@@ -167,7 +155,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border-2 border-gray-100">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
@@ -201,7 +188,6 @@ export const AdminPanel: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Appointments List */}
         <div className="space-y-3">
           {sortedFilteredAppointments.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg p-12 text-center border-2 border-gray-100">

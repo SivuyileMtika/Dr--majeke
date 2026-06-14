@@ -23,3 +23,18 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# AI tool artifacts
+.bolt/
+*.tsx.bak
+
+# Dangerous utility scripts — run locally only, never deploy
+server/clearDb.js
+
+# Service account key files
+*.json
+!package.json
+!package-lock.json
+!**/tsconfig*.json
+!firebase.json
+!.firebaserc

@@ -9,7 +9,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users database (in real app, this would be in a backend)
 const mockUsers: (User & { password: string })[] = [
   {
     id: '1',
@@ -30,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   useEffect(() => {
-    // Check for stored user session
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
@@ -51,10 +49,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise(resolve => setTimeout(resolve, 800));
     const user = mockUsers.find(
       u => u.email === credentials.email && u.password === credentials.password
     );
@@ -76,18 +71,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if user already exists
+    await new Promise(resolve => setTimeout(resolve, 800));
     const existingUser = mockUsers.find(u => u.email === data.email);
     if (existingUser) {
       setAuthState(prev => ({ ...prev, isLoading: false }));
       return false;
     }
-    
-    // Create new user
     const newUser = {
       id: Date.now().toString(),
       name: data.name,

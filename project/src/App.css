@@ -1,11 +1,14 @@
-/* Add your CSS selectors and rules here. For example: */
+.home-hero-bg {
+  background-image: url('./assets/home-bg.jpg');
+}
+
 #home {
   position: relative;
   background-size: cover;
-  background-position: center;
+  background-position: center center;
   background-repeat: no-repeat;
-  padding-top: 3rem; /* reduced */
-  padding-bottom: 3rem; /* reduced */
+  padding-top: 3rem;
+  padding-bottom: 3rem;
   padding-left: 1rem;
   padding-right: 1rem;
   min-height: unset;
@@ -14,13 +17,8 @@
   align-items: center;
   width: 100%;
   box-sizing: border-box;
-  /* Add vendor prefix for box-sizing if supporting older browsers */
-  /* -webkit-box-sizing: border-box; */
-  background-size: cover;
-  background-position: center center;
 }
 
-/* Responsive adjustments */
 @media (max-width: 900px) {
   #home {
     padding-top: 4rem;

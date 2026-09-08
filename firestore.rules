@@ -2,9 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Appointments — dashboard reads directly via client SDK
+    // Appointments — dashboard reads directly via client SDK.
+    // Requires a signed-in Firebase Auth account carrying the `doctor`
+    // custom claim (set only via the Admin SDK when the account is
+    // provisioned) — `request.auth != null` alone isn't enough, since
+    // Firebase's public signUp endpoint lets anyone create an
+    // authenticated-but-unprivileged session.
     match /appointments/{apptId} {
-      allow read: if true;   // doctor dashboard reads live
+      allow read: if request.auth != null && request.auth.token.doctor == true;
       allow write: if false; // only server (Admin SDK) writes
     }
 

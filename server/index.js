@@ -70,8 +70,14 @@ try {
   // service stays up for >15 days (as it did Aug 3 -> Sep 8), every future
   // date runs out and the booking flow reports "no available appointment
   // dates" until the next deploy. Re-seed daily so it self-heals.
+  //
+  // Interval is hourly (9 slots/day for 08:00-17:00), not every 30 minutes:
+  // WhatsApp interactive list messages cap out at 10 rows total, so 18
+  // half-hourly slots + "Back" silently truncated to the first 10 rows —
+  // afternoon slots and "Back" itself were never reachable. 9 slots + Back
+  // fits exactly.
   const reseedTimeSlots = () =>
-    seedTimeSlots(db, 15, 8, 17, 30).catch(e => console.warn('Time slots seeding warning:', e.message));
+    seedTimeSlots(db, 15, 8, 17, 60).catch(e => console.warn('Time slots seeding warning:', e.message));
   reseedTimeSlots();
   setInterval(reseedTimeSlots, 24 * 60 * 60 * 1000);
 } catch (err) {

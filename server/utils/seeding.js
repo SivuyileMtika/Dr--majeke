@@ -48,8 +48,24 @@ async function seedTimeSlots(db, days = 7, startHour = 9, endHour = 17, interval
 
     const snap = await db.collection('time_slots').where('date', '==', dateStr).get();
     if (!snap.empty) {
-      console.log(`Slots already exist for ${dateStr}, skipping...`);
-      continue;
+      // WhatsApp list messages cap out at 10 rows total, so the slot
+      // interval has to fit (startHour..endHour) + 1 for "Back" within
+      // that. If every slot already on this date is still unbooked and
+      // was seeded at a different interval (e.g. the old 30-minute grid),
+      // it's safe to clear and re-seed at the current interval — nothing
+      // real references those docs yet. A date with any pending/confirmed
+      // booking is left alone entirely.
+      const allAvailableAndStale = snap.docs.every(doc => {
+        const data = doc.data();
+        return data.status === 'available' && data.duration_minutes !== intervalMinutes;
+      });
+      if (allAvailableAndStale) {
+        await Promise.all(snap.docs.map(doc => doc.ref.delete()));
+        console.log(`Rebuilding ${dateStr} at ${intervalMinutes}-minute granularity (was unbooked)...`);
+      } else {
+        console.log(`Slots already exist for ${dateStr}, skipping...`);
+        continue;
+      }
     }
 
     for (let hour = startHour; hour < endHour; hour++) {

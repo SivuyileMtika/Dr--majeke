@@ -2,16 +2,7 @@ const admin  = require('firebase-admin');
 const { markSlotConfirmed, markSlotAvailable } = require('../utils/fireStoreHelpers');
 const { sendWhatsAppMessage } = require('../utils/whatsappButtons');
 const { createAppointmentEvent } = require('../utils/googleCalendar');
-
-function toE164(phone) {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('27') && digits.length === 11) return `+${digits}`;
-  if (digits.startsWith('0')  && digits.length === 10) return `+27${digits.slice(1)}`;
-  if (digits.length === 9) return `+27${digits}`;
-  if (phone.startsWith('+')) return phone;
-  return `+${digits}`;
-}
+const { normalizePhone: toE164 } = require('../modules/identity');
 
 async function confirmAppointmentHandler(db, req, res) {
   const { appointmentId, confirm, doctorName, rejectionReason } = req.body || {};

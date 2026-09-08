@@ -64,7 +64,16 @@ try {
 
   seedMedicalAids(db).catch(e => console.warn('Medical aids seeding warning:', e.message));
   seedServices(db).catch(e => console.warn('Services seeding warning:', e.message));
-  seedTimeSlots(db, 15, 8, 17, 30).catch(e => console.warn('Time slots seeding warning:', e.message));
+
+  // Keep a rolling 15-day window of bookable slots. Without this, the window
+  // only ever gets extended when the server restarts/redeploys — if the
+  // service stays up for >15 days (as it did Aug 3 -> Sep 8), every future
+  // date runs out and the booking flow reports "no available appointment
+  // dates" until the next deploy. Re-seed daily so it self-heals.
+  const reseedTimeSlots = () =>
+    seedTimeSlots(db, 15, 8, 17, 30).catch(e => console.warn('Time slots seeding warning:', e.message));
+  reseedTimeSlots();
+  setInterval(reseedTimeSlots, 24 * 60 * 60 * 1000);
 } catch (err) {
   console.error('Failed to initialize Firebase Admin:', err.message);
   process.exit(1);

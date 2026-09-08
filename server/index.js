@@ -1,9 +1,10 @@
-const express    = require('express');
-const cors       = require('cors');
-const dotenv     = require('dotenv');
-const admin      = require('firebase-admin');
-const bodyParser = require('body-parser');
-const crypto     = require('crypto');
+const express      = require('express');
+const cors         = require('cors');
+const dotenv       = require('dotenv');
+const admin        = require('firebase-admin');
+const bodyParser   = require('body-parser');
+const cookieParser = require('cookie-parser');
+const crypto       = require('crypto');
 const {
   getOrCreateConversation,
   updateConversationState,
@@ -38,6 +39,8 @@ const { authMiddleware }            = require('./middleware/auth');
 const { confirmAppointmentHandler } = require('./controllers/appointmentController');
 const { sendWhatsAppMessage, sendWhatsAppButtons, sendFlowMessage } = require('./utils/whatsappButtons');
 const { decryptRequest, encryptResponse }     = require('./utils/flowCrypto');
+const { createAuthRouter, sessionMiddleware } = require('./modules/auth');
+const { getOrCreatePatientByPhone }           = require('./modules/identity');
 
 dotenv.config();
 
@@ -47,6 +50,7 @@ const requiredEnvVars = [
   'WHATSAPP_VERIFY_TOKEN',
   'FIREBASE_SERVICE_ACCOUNT',
   'DOCTOR_AUTH_TOKEN',
+  'AUTH_JWT_SECRET',
 ];
 const missing = requiredEnvVars.filter(v => !process.env[v]);
 if (missing.length > 0) {
@@ -88,12 +92,15 @@ try {
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 
 // Preserve raw body for Meta signature verification
 app.use(bodyParser.json({
   verify: (req, _res, buf) => { req.rawBody = buf; },
 }));
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(sessionMiddleware);
+app.use('/api/v1/auth', createAuthRouter(db));
 
 const PORT = process.env.PORT || 3000;
 
@@ -253,8 +260,15 @@ async function processFlowCompletion(phone, nfmReply) {
   }
 
   await markSlotPending(db, slotSnap.docs[0].id, phone);
+  let patientId = null;
+  try {
+    patientId = (await getOrCreatePatientByPhone(db, phone, { name: patient_name.trim(), source: 'whatsapp' })).id;
+  } catch (idErr) {
+    console.warn('Patient identity resolution failed (non-fatal):', idErr.message);
+  }
   await createAppointment(db, {
     phone,
+    patient_id:        patientId,
     patient_name:      patient_name.trim(),
     date:              selected_date,
     time:              selected_time,
@@ -326,6 +340,19 @@ async function processWebhook(body) {
           let nextState       = conversation.current_state;
           const collectedData = conversation.collected_data || {};
 
+          // Resolve this phone to its canonical patient_id (Phase 0 §4/§5),
+          // creating one on first contact. Non-fatal: the booking flow
+          // already worked purely off phone numbers before this existed,
+          // so a resolution failure here shouldn't block a patient booking.
+          if (!collectedData.patient_id) {
+            try {
+              const patient = await getOrCreatePatientByPhone(db, phone, { source: 'whatsapp' });
+              collectedData.patient_id = patient.id;
+            } catch (idErr) {
+              console.warn('Patient identity resolution failed (non-fatal):', idErr.message);
+            }
+          }
+
           console.log(`State: ${nextState}`);
 
           try {
@@ -353,6 +380,7 @@ async function processWebhook(body) {
               } else if (t === '1' || t.includes('confirm') || t.includes('yes') || t.includes('booking')) {
                 const apt = await createAppointment(db, {
                   phone,
+                  patient_id:        collectedData.patient_id || null,
                   patient_name:      collectedData.patient_name,
                   date:              collectedData.selected_date,
                   time:              collectedData.selected_time,

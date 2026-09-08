@@ -9,7 +9,22 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const mockUsers: (User & { password: string })[] = [];
+// Real backend-controlled identity (Phase 0 §2) — replaces the old mock
+// in-memory user array + localStorage. The session itself lives in an
+// httpOnly cookie set by the server (never readable by page JS); this
+// component only ever holds the patient's public profile in memory/state.
+const API_BASE = import.meta.env.VITE_API_URL || 'https://dr-majeke-production.up.railway.app';
+
+async function apiCall(path: string, body?: object) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // send/receive the session cookie
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({ success: false }));
+  return { ok: res.ok, data };
+}
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
@@ -18,28 +33,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isLoading: true,
   });
 
+  // Restore the session (if any) on load by asking the server who the
+  // current cookie belongs to — there's nothing durable to read locally.
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    (async () => {
       try {
-        const user = JSON.parse(storedUser);
-        setAuthState({ user, isAuthenticated: true, isLoading: false });
+        const res = await fetch(`${API_BASE}/api/v1/auth/me`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setAuthState({ user: mapPatient(data.patient), isAuthenticated: true, isLoading: false });
+          return;
+        }
       } catch {
-        localStorage.removeItem('user');
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+        // network error — fall through to signed-out state
       }
-    } else {
       setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
+    })();
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    const user = mockUsers.find(u => u.email === credentials.email && u.password === credentials.password);
-    if (user) {
-      const { password, ...userWithoutPassword } = user;
-      setAuthState({ user: userWithoutPassword, isAuthenticated: true, isLoading: false });
-      localStorage.setItem('user', JSON.stringify(userWithoutPassword));
+    const { ok, data } = await apiCall('/api/v1/auth/login', credentials);
+    if (ok && data.success) {
+      setAuthState({ user: mapPatient(data.patient), isAuthenticated: true, isLoading: false });
       return true;
     }
     setAuthState(prev => ({ ...prev, isLoading: false }));
@@ -48,29 +64,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (data: RegisterData): Promise<boolean> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
-    if (mockUsers.find(u => u.email === data.email)) {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-      return false;
-    }
-    const newUser = {
-      id: Date.now().toString(),
+    const { ok, data: res } = await apiCall('/api/v1/auth/register', {
       name: data.name,
       email: data.email,
       phone: data.phone,
-      role: 'user' as const,
       password: data.password,
-      createdAt: new Date().toISOString(),
-    };
-    mockUsers.push(newUser);
-    const { password, ...userWithoutPassword } = newUser;
-    setAuthState({ user: userWithoutPassword, isAuthenticated: true, isLoading: false });
-    localStorage.setItem('user', JSON.stringify(userWithoutPassword));
-    return true;
+    });
+    if (ok && res.success) {
+      setAuthState({ user: mapPatient(res.patient), isAuthenticated: true, isLoading: false });
+      return true;
+    }
+    setAuthState(prev => ({ ...prev, isLoading: false }));
+    return false;
   };
 
   const logout = () => {
     setAuthState({ user: null, isAuthenticated: false, isLoading: false });
-    localStorage.removeItem('user');
+    fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
   };
 
   return (
@@ -79,6 +89,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     </AuthContext.Provider>
   );
 };
+
+// Maps the server's patient record (canonical patient_id + attributes)
+// onto the User shape the rest of the website already expects.
+function mapPatient(patient: any): User {
+  return {
+    id: patient.patient_id || patient.id,
+    name: patient.name,
+    email: patient.email,
+    phone: patient.phone,
+    role: 'user',
+    createdAt: patient.created_at,
+  };
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

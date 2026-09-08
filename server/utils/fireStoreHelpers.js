@@ -25,9 +25,10 @@ async function updateConversationState(db, phone, state, collectedData = null) {
   await db.collection('patient_conversations').doc(phone).update(updates);
 }
 
-async function createAppointment(db, { phone, patient_name, date, time, payment_method, medical_aid, medical_plan, membership_number, id_number, reason_for_visit, service_id }) {
+async function createAppointment(db, { phone, patient_id, patient_name, date, time, payment_method, medical_aid, medical_plan, membership_number, id_number, reason_for_visit, service_id }) {
   const ref = await db.collection('appointments').add({
     phone,
+    patient_id:        patient_id || null, // canonical identity (Phase 0 §3) — phone stays too, unchanged, for backward compat
     patient_name,
     date,
     time,

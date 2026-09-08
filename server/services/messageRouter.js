@@ -486,4 +486,10 @@ module.exports = {
   handleIdNumber,
   handleReasonForVisit,
   handleAwaitingFlow,
+  // Exported for unit tests (server/test/) — pure functions, safe to test
+  // in isolation without a real WhatsApp/Firestore connection.
+  parseIndex,
+  isValidSAID,
+  isValidPassport,
+  isValidMembershipNumber,
 };

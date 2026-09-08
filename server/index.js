@@ -402,31 +402,6 @@ async function processWebhook(body) {
   }
 }
 
-// TEMPORARY, ONE-TIME BOOTSTRAP — creates the first doctor dashboard login
-// account and grants it the `doctor` custom claim that firestore.rules and
-// authMiddleware require. Self-limiting: only works while zero Firebase Auth
-// users exist, so it can't be reused once the first account is created.
-// Remove this route entirely once that account exists and login is verified.
-app.post('/setup/create-doctor-user', async (req, res) => {
-  try {
-    const existing = await admin.auth().listUsers(1);
-    if (existing.users.length > 0) {
-      return res.status(403).json({ success: false, error: 'A doctor account already exists. This setup route is disabled.' });
-    }
-    const { email, password } = req.body || {};
-    if (!email || !password || password.length < 8) {
-      return res.status(400).json({ success: false, error: 'email and password (min 8 chars) are required' });
-    }
-    const user = await admin.auth().createUser({ email, password });
-    await admin.auth().setCustomUserClaims(user.uid, { doctor: true });
-    console.log(`Doctor account created via /setup/create-doctor-user: ${email} (${user.uid})`);
-    return res.json({ success: true, uid: user.uid, email });
-  } catch (err) {
-    console.error('create-doctor-user error:', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 app.post('/confirm-appointment', authMiddleware, (req, res) => confirmAppointmentHandler(db, req, res));
 
 app.get('/services', async (req, res) => {

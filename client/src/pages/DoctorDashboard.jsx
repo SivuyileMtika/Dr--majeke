@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getAuthHeader } from '../authHeader';
 import axios from 'axios';
 import {
   Check, X, Clock, Phone, CreditCard, Stethoscope,
@@ -10,7 +11,6 @@ import {
 } from 'lucide-react';
 
 const API_BASE   = process.env.REACT_APP_API_URL    || 'http://localhost:3000';
-const AUTH_TOKEN = process.env.REACT_APP_DOCTOR_TOKEN || '';
 
 const pad      = n => String(n).padStart(2, '0');
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
@@ -784,7 +784,6 @@ export default function DoctorDashboard() {
   }, [appointments, autoPilot]);
 
   useEffect(() => {
-    if (!AUTH_TOKEN) { setError('REACT_APP_DOCTOR_TOKEN not set'); setLoading(false); return; }
     const q = query(collection(db, 'appointments'), orderBy('created_at', 'desc'));
     return onSnapshot(q,
       snap => { setAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); },
@@ -795,9 +794,10 @@ export default function DoctorDashboard() {
   const act = async (id, confirm, rejectionReason) => {
     setActionLoading(s => ({ ...s, [id]: true }));
     try {
+      const headers = await getAuthHeader();
       await axios.post(`${API_BASE}/confirm-appointment`,
         { appointmentId: id, confirm, doctorName: 'Dr. SG Majeke', rejectionReason: rejectionReason || '' },
-        { headers: { Authorization: `Bearer ${AUTH_TOKEN}`, 'Content-Type': 'application/json' } }
+        { headers }
       );
       showBanner(confirm ? 'Appointment approved' : 'Appointment rejected');
     } catch (e) {

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getAuthHeader } from '../authHeader';
 import axios from 'axios';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3000';
-const AUTH_TOKEN = process.env.REACT_APP_DOCTOR_TOKEN || '';
 
 export default function WhatsAppBookingsPanel() {
   const [appointments, setAppointments] = useState([]);
@@ -14,12 +14,6 @@ export default function WhatsAppBookingsPanel() {
   const [actionError, setActionError] = useState({});
 
   useEffect(() => {
-    if (!AUTH_TOKEN) {
-      setError('REACT_APP_DOCTOR_TOKEN not configured');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     const q = query(
@@ -67,15 +61,10 @@ export default function WhatsAppBookingsPanel() {
     setActionLoading(s => ({ ...s, [id]: true }));
     setActionError(s => ({ ...s, [id]: null }));
     try {
-      const axiosConfig = {
-        headers: {
-          Authorization: `Bearer ${AUTH_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      };
+      const headers = await getAuthHeader();
       await axios.post(`${API_BASE}/confirm-appointment`,
         { appointmentId: id, confirm: true, doctorName: 'Dr. Dashboard' },
-        axiosConfig
+        { headers }
       );
     } catch (err) {
       const errMsg = err.response?.data?.error || err.message || 'Action failed';
@@ -90,15 +79,10 @@ export default function WhatsAppBookingsPanel() {
     setActionLoading(s => ({ ...s, [id]: true }));
     setActionError(s => ({ ...s, [id]: null }));
     try {
-      const axiosConfig = {
-        headers: {
-          Authorization: `Bearer ${AUTH_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      };
+      const headers = await getAuthHeader();
       await axios.post(`${API_BASE}/confirm-appointment`,
         { appointmentId: id, confirm: false, doctorName: 'Dr. Dashboard' },
-        axiosConfig
+        { headers }
       );
     } catch (err) {
       const errMsg = err.response?.data?.error || err.message || 'Action failed';
